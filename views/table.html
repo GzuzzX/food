@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Food Restaurant - เลือกโต๊ะ</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/db-client.js" defer></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: {
+                'hf-green': '#A3B18A', 'hf-green-dark': '#344E41',
+                'hf-green-light': '#E9EDC9', 'hf-bg': '#F8F9FA',
+            }}}
+        }
+        const t = {
+            th: { title:'เลือกมุมโปรดของคุณ', sub:'กรุณาเลือกโต๊ะที่ต้องการด้านล่าง', vacant:'ว่าง', occupied:'ไม่ว่าง', cleaning:'กำลังทำความสะอาด', selected:'เลือกแล้ว', select:'เลือกโต๊ะนี้', full:'เต็มแล้ว', cleaning_btn:'กำลังจัดโต๊ะ', next:'ดำเนินการต่อ', chef:'แผงควบคุมเชฟ' },
+            en: { title:'Choose Your Spot', sub:'Please select your preferred table below.', vacant:'Available', occupied:'Occupied', cleaning:'Cleaning', selected:'Selected', select:'Select Table', full:'Occupied', cleaning_btn:'Cleaning', next:'Continue', chef:'Chef Panel' },
+        };
+        let lang = 'th', selectedId = null;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&display=swap');
+        body { font-family:'Noto Sans Thai',sans-serif; background:#F8F9FA; }
+        .table-card { transition:all .3s ease; border:2px solid transparent; cursor:pointer; }
+        .table-card:hover:not(.disabled) { transform:translateY(-6px); border-color:#A3B18A; box-shadow:0 16px 32px -8px rgba(163,177,138,.25); }
+        .table-card.selected { border-color:#A3B18A; box-shadow:0 12px 24px -6px rgba(163,177,138,.3); }
+        .disabled { cursor:not-allowed; opacity:.75; pointer-events: none; }
+        .img-dim { filter:grayscale(80%) opacity(.5); }
+        .table-card.pending-selected {
+            background: #344E41 !important;
+            border-color: #344E41 !important;
+            box-shadow: 0 12px 24px -6px rgba(52,78,65,.35);
+        }
+        .table-card.pending-selected h2 { color: #fff !important; }
+        .table-card.pending-selected .card-emoji { filter: none; }
+        @keyframes pulse-green { 0%,100%{ box-shadow:0 0 0 0 rgba(163,177,138,.4); } 50%{ box-shadow:0 0 0 12px rgba(163,177,138,0); } }
+        .selected { animation:pulse-green 2s infinite; }
+    </style>
+</head>
+<body class="min-h-screen pb-32">
+
+<nav class="navbar bg-white/90 backdrop-blur-md sticky top-0 z-50 px-4 md:px-12 border-b border-gray-100 shadow-sm">
+    <div class="flex-1">
+        <a class="text-2xl font-bold text-neutral">Happy<span class="text-hf-green">Food</span> Restaurant</a>
+    </div>
+    <div class="flex-none gap-3 items-center">
+        <div class="join border border-gray-200 rounded-full overflow-hidden">
+            <button id="btn-th" onclick="setLang('th')" class="btn btn-xs md:btn-sm join-item bg-hf-green-light border-none font-bold">TH</button>
+            <button id="btn-en" onclick="setLang('en')" class="btn btn-xs md:btn-sm join-item bg-transparent border-none">EN</button>
+        </div>
+        <div class="tooltip tooltip-bottom" data-tip="แผงควบคุมเชฟ">
+            <a href="/login" class="btn btn-ghost btn-circle avatar">
+                <div class="w-9 rounded-full border-2 border-hf-green bg-hf-green-light flex items-center justify-center text-lg">👨‍🍳</div>
+            </a>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto p-6 md:p-12">
+    <header class="text-center mb-10">
+        <h1 id="txt-title" class="text-4xl md:text-5xl font-extrabold text-neutral mb-3">เลือกมุมโปรดของคุณ</h1>
+        <p id="txt-sub" class="text-lg text-gray-400 font-light">กรุณาเลือกโต๊ะที่ต้องการด้านล่าง</p>
+    </header>
+
+    <div class="flex justify-center gap-6 mb-10 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm max-w-xs mx-auto">
+        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-hf-green-light border border-hf-green"></div><span id="leg-vacant" class="text-xs font-medium">ว่าง</span></div>
+        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-300"></div><span id="leg-occupied" class="text-xs font-medium">ไม่ว่าง</span></div>
+        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-hf-green-dark"></div><span id="leg-selected" class="text-xs font-medium">เลือกแล้ว</span></div>
+    </div>
+
+    <div id="table-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+</main>
+
+<div id="next-bar" class="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-xs hidden z-50 px-4">
+    <button onclick="goToMenu()" class="btn btn-block bg-hf-green border-none text-white shadow-2xl rounded-full h-14 text-lg font-bold hover:bg-hf-green-dark transition-colors">
+        <span id="txt-next">ดำเนินการต่อ</span>
+        <span id="lbl-table" class="ml-2 font-bold opacity-80"></span>
+    </button>
+</div>
+
+<script>
+let allMenuItems = [];
+let pendingTableId = null;
+let refreshInterval = null;
+
+async function renderMenu(filter = 'all', q = '') {
+    if (!allMenuItems.length) {
+        try {
+            console.log("📥 Fetching menu from API...");
+            allMenuItems = await DB.getMenu();
+            console.log(`✅ Got ${allMenuItems.length} menu items`);
+        } catch(e) {
+            console.error("❌ Menu fetch error:", e);
+            return;
+        }
+    }
+    const menu = allMenuItems.filter(m => m.available);
+    const grid = document.getElementById('table-grid');
+    grid.innerHTML = '';
+
+    if (!menu.length) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-20 text-gray-400">
+                <p class="text-2xl mb-2">🪑</p>
+                <p class="text-lg">ไม่พบข้อมูลโต๊ะในระบบ</p>
+                <p class="text-sm mt-2">กรุณาติดต่อ Admin เพื่อตั้งค่าโต๊ะ</p>
+            </div>
+        `;
+        return;
+    }
+
+    // ✅ ดึง table status จาก API
+    let tables = {};
+    try {
+        tables = await fetch('/tables').then(r => r.json());
+        console.log("✅ Tables fetched from API:", tables);
+    } catch (e) {
+        console.error("❌ Error fetching tables:", e);
+        return;
+    }
+
+    Object.entries(tables).sort().forEach(([id, info]) => {
+        const isOccupied = info.status === 'occupied';
+        const isCleaning = info.status === 'cleaning';
+        const isDisabled = isOccupied || isCleaning;
+        const isSelected = selectedId === id;
+
+        const statusLabel = isSelected
+            ? t[lang].selected
+            : isOccupied ? t[lang].occupied
+            : isCleaning ? t[lang].cleaning
+            : t[lang].vacant;
+
+        const badgeColor = isSelected
+            ? 'bg-white/20 text-white border border-white/30'
+            : isOccupied ? 'bg-gray-300 text-gray-600'
+            : isCleaning ? 'bg-yellow-100 text-yellow-700'
+            : 'bg-hf-green-light text-hf-green-dark';
+
+        const card = document.createElement('div');
+        card.className = `card bg-white shadow-sm table-card ${isDisabled ? 'disabled' : ''} ${isSelected ? 'pending-selected' : ''}`;
+
+        if (!isDisabled) {
+            card.onclick = () => selectTable(id, card);
+        }
+
+        const emojiClass = `card-emoji text-8xl ${isDisabled && !isSelected ? 'img-dim' : ''} transition-all duration-300`;
+
+        card.innerHTML = `
+            <figure class="px-6 pt-6 relative">
+                <span class="absolute top-8 right-8 badge ${badgeColor} text-[10px] font-bold px-3 py-2">${statusLabel}</span>
+                <div class="${emojiClass}">🪑</div>
+            </figure>
+            <div class="card-body items-center text-center p-6 pt-3">
+                <h2 class="card-title text-xl font-extrabold ${isDisabled && !isSelected ? 'text-gray-300' : isSelected ? 'text-white' : 'text-neutral'}">Table ${id}</h2>
+                ${isSelected
+                    ? `<button class="btn btn-sm btn-block bg-white/20 text-white border border-white/30 mt-3 rounded-xl backdrop-blur-sm">✓ ${t[lang].selected}</button>`
+                    : isOccupied
+                    ? `<button class="btn btn-sm btn-block btn-disabled mt-3 rounded-xl" disabled onclick="showOccupiedAlert('${id}')">${t[lang].full}</button>`
+                    : isCleaning
+                    ? `<button class="btn btn-sm btn-block bg-yellow-100 text-yellow-700 border-none mt-3 rounded-xl cursor-not-allowed" disabled>${t[lang].cleaning_btn}</button>`
+                    : `<button onclick="selectTable('${id}', this.closest('.table-card'))" class="btn btn-sm btn-block border-hf-green text-hf-green bg-white hover:bg-hf-green hover:text-white mt-3 rounded-xl transition-colors">${t[lang].select}</button>`
+                }
+            </div>`;
+        grid.appendChild(card);
+    });
+}
+
+// ✅ เลือกโต๊ะ + ตรวจสอบว่างหรือไม่
+async function selectTable(id, el) {
+    try {
+        console.log(`🔍 Checking table ${id} status...`);
+        const tables = await fetch('/tables').then(r => r.json());
+        const tableStatus = tables[id];
+
+        console.log(`Table ${id} status:`, tableStatus);
+
+        // ✅ ถ้าโต๊ะถูกใช้แล้ว �� ห้ามคลิก
+        if (tableStatus && tableStatus.status === 'occupied') {
+            console.warn(`⚠️ Table ${id} is occupied! Cannot select.`);
+            showOccupiedAlert(id);
+            return;
+        }
+
+        // ✅ ถ้าอยู่ในสถานะ cleaning → ห้ามคลิก
+        if (tableStatus && tableStatus.status === 'cleaning') {
+            console.warn(`⚠️ Table ${id} is cleaning!`);
+            Swal.fire({
+                title: '⏳ โต๊ะกำลังจัดเตรียม',
+                text: 'กรุณารอสักครู่',
+                icon: 'info',
+                confirmButtonColor: '#A3B18A',
+                confirmButtonText: 'ตกลง'
+            });
+            return;
+        }
+
+        // ✅ ถ้าว่าง → เลือกได้ตามปกติ
+        console.log(`✅ Table ${id} is available`);
+        selectedId = id;
+        await renderMenu();
+        document.getElementById('next-bar').classList.remove('hidden');
+        document.getElementById('lbl-table').innerText = `(Table ${id})`;
+    } catch (e) {
+        console.error("❌ Error checking table status:", e);
+    }
+}
+
+// ✅ แจ้งเตือนเมื่อคลิกโต๊ะที่ occupied
+function showOccupiedAlert(tableId) {
+    Swal.fire({
+        title: '⚠️ โต๊ะนี้ถูกใช้อยู่',
+        text: `Table ${tableId} มีลูกค้าใช้งานอยู่แล้ว\nกรุณาเลือกโต๊ะอื่น`,
+        icon: 'warning',
+        confirmButtonColor: '#A3B18A',
+        confirmButtonText: 'ตกลง'
+    });
+}
+
+// ✅ LOCK TABLE ทันที + สร้าง SESSION + ไปเมนู
+async function goToMenu() {
+    if (!selectedId) return;
+
+    try {
+        console.log(`📍 Locking table: ${selectedId}`);
+        
+        // ✅ 1. ล็อกโต๊ะ ก่อน ไปหน้าเมนู
+        const lockRes = await fetch(`/tables/${selectedId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'occupied' })
+        });
+
+        if (!lockRes.ok) throw new Error('Failed to lock table');
+        console.log(`✅ Table ${selectedId} locked as occupied`);
+
+        // 2. เปิด Session ใหม่
+        const sessionRes = await fetch('/start-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table_id: selectedId })
+        });
+        if (sessionRes.ok) {
+            const { sessionId } = await sessionRes.json();
+            localStorage.setItem('activeSessionId', sessionId);
+            console.log(`✅ Session created: ${sessionId}`);
+        }
+
+        // 3. จำเบอร์โต๊ะ
+        DB.set(DB.KEYS.SELECTED_TABLE, selectedId);
+
+        // 4. ไปหน้าเมนู
+        window.location.href = '/menu-page';
+    } catch (error) {
+        console.error("❌ Error:", error);
+        Swal.fire({
+            title: 'เกิดข้อผิดพลาด',
+            text: error.message || 'ไม่สามารถล็อกโต๊ะได้ กรุณาลองใหม่',
+            icon: 'error',
+            confirmButtonColor: '#A3B18A'
+        });
+    }
+}
+
+async function initPage() {
+    console.log("🔄 Initializing table selection page...");
+    
+    // ✅ รอให้ DB โหลด
+    let attempts = 0;
+    while (typeof DB === 'undefined' && attempts < 100) {
+        await new Promise(r => setTimeout(r, 50));
+        attempts++;
+    }
+
+    if (typeof DB === 'undefined') {
+        console.error("❌ DB failed to load");
+        return;
+    }
+
+    const prevTable = DB.get(DB.KEYS.SELECTED_TABLE);
+    const prevSession = localStorage.getItem('activeSessionId');
+
+    console.log(`📝 Previous Table: ${prevTable}, Session: ${prevSession}`);
+
+    // ✅ FIXED: ถ้ามี session ใช้งานอยู่ → ให้ไปเมนูต่อ (ไม่ release โต๊ะ)
+    if (prevTable && prevSession) {
+        console.log(`✅ Session still active, redirecting to menu...`);
+        window.location.href = '/menu-page';
+        return;
+    }
+
+    // ✅ ถ้า occupied แต่ไม่มี session → release (โต๊ะค้าง)
+    if (prevTable && !prevSession) {
+        try {
+            console.log(`🔓 No session but table locked, releasing: ${prevTable}`);
+            await fetch(`/tables/${prevTable}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status: 'vacant', order_id: null })
+            });
+        } catch(e) { console.error("Release table error:", e); }
+    }
+
+    // ✅ Clear local storage
+    DB.set(DB.KEYS.SELECTED_TABLE, null);
+    DB.set(DB.KEYS.CURRENT_ORDER, null);
+    localStorage.removeItem('activeSessionId');
+    selectedId = null;
+
+    try {
+        const tables = await fetch('/tables').then(r => r.json());
+        console.log("✅ Tables data loaded");
+    } catch(e) { console.error("❌ Error loading tables:", e); }
+
+    console.log("✅ Page initialized, rendering tables...");
+    await renderMenu();
+
+    // ✅ AUTO-REFRESH ทุก 3 วินาที เพื่อดึงสถานะโต๊ะที่อัปเดต
+    refreshInterval = setInterval(async () => {
+        console.log("🔄 Auto-refreshing table status...");
+        await renderMenu();
+    }, 3000);
+}
+
+function setLang(l) {
+    lang = l;
+    document.getElementById('txt-title').innerText = t[l].title;
+    document.getElementById('txt-sub').innerText = t[l].sub;
+    document.getElementById('leg-vacant').innerText = t[l].vacant;
+    document.getElementById('leg-occupied').innerText = t[l].occupied;
+    document.getElementById('leg-selected').innerText = t[l].selected;
+    document.getElementById('txt-next').innerText = t[l].next;
+    document.getElementById('btn-th').className = `btn btn-xs md:btn-sm join-item border-none font-bold ${l==='th'?'bg-hf-green-light':'bg-transparent'}`;
+    document.getElementById('btn-en').className = `btn btn-xs md:btn-sm join-item border-none font-bold ${l==='en'?'bg-hf-green-light':'bg-transparent'}`;
+    renderMenu();
+}
+
+// ✅ ยกเลิก refresh เมื่อออกจากหน้า
+window.addEventListener('beforeunload', () => {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        console.log("✅ Refresh interval cleared");
+    }
+});
+
+window.addEventListener('DOMContentLoaded', initPage);
+</script>
+</body>
+</html>

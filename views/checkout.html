@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ชำระเงิน - Happy Food</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="/db-client.js" defer></script>
+    <script>tailwind.config = { theme: { extend: { colors: { 'hf-green':'#A3B18A','hf-green-dark':'#344E41','hf-green-light':'#E9EDC9','hf-bg':'#F8F9FA' }}}}</script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&display=swap');
+        body { font-family:'Noto Sans Thai',sans-serif; background:#F8F9FA; }
+        .pay-card { transition:all .3s ease; border:2px solid transparent; cursor:pointer; }
+        .pay-card.active { border-color:#A3B18A; background:rgba(163,177,138,.08); }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+<nav class="navbar bg-white border-b border-gray-100 px-6 sticky top-0 z-50 shadow-sm">
+    <div class="flex-1">
+        <a href="/menu-page" class="btn btn-ghost btn-circle text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+        </a>
+        <h1 class="text-xl font-bold ml-2 text-neutral">Check<span class="text-hf-green">out</span></h1>
+    </div>
+    <div id="table-badge" class="badge badge-neutral p-3 font-bold">Table --</div>
+</nav>
+
+<main class="container mx-auto max-w-2xl p-6 space-y-6">
+
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-bold text-lg mb-4 flex items-center gap-2">📝 รายการอาหารของคุณ</h2>
+        <div id="summary-items" class="space-y-3 mb-6"></div>
+        <div class="border-t border-dashed pt-4 space-y-2">
+            <div class="flex justify-between text-sm text-gray-400"><span>ยอดรวม (Subtotal)</span><span id="subtotal">฿0.00</span></div>
+            <div class="flex justify-between text-sm text-gray-400"><span>ภาษีมูลค่าเพิ่ม (VAT 7%)</span><span id="vat">฿0.00</span></div>
+            <div class="flex justify-between text-xl font-black mt-4 pt-4 border-t border-gray-100">
+                <span class="text-neutral">ยอดสุทธิ (Total)</span>
+                <span id="grand-total" class="text-hf-green">฿0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-bold text-lg mb-5 flex items-center gap-2">💳 ช่องทางการชำระเงิน</h2>
+        <div class="space-y-3">
+            <div onclick="selectPay('promptpay',this)" class="pay-card active p-4 rounded-2xl bg-gray-50 flex items-center gap-4">
+                <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-2xl">🏦</div>
+                <div class="flex-1"><p class="font-bold text-sm">Thai QR PromptPay</p><p class="text-[11px] text-gray-400">สแกนจ่ายผ่านแอปธนาคารทุกประเภท</p></div>
+                <input type="radio" name="pay" checked class="radio radio-sm radio-success" />
+            </div>
+            <div onclick="selectPay('card',this)" class="pay-card p-4 rounded-2xl bg-gray-50 flex items-center gap-4">
+                <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-blue-600 font-bold text-xs italic">VISA</div>
+                <div class="flex-1"><p class="font-bold text-sm">Credit / Debit Card</p><p class="text-[11px] text-gray-400">รองรับ VISA, Mastercard, JCB</p></div>
+                <input type="radio" name="pay" class="radio radio-sm radio-success" />
+            </div>
+            <div onclick="selectPay('cash',this)" class="pay-card p-4 rounded-2xl bg-gray-50 flex items-center gap-4">
+                <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-2xl">💵</div>
+                <div class="flex-1"><p class="font-bold text-sm">เงินสด (Cash)</p><p class="text-[11px] text-gray-400">เรียกพนักงานมาเก็บเงินที่โต๊ะ</p></div>
+                <input type="radio" name="pay" class="radio radio-sm radio-success" />
+            </div>
+        </div>
+        <button onclick="processPayment()" class="btn btn-block bg-hf-green border-none text-white mt-8 h-14 rounded-2xl text-lg font-bold shadow-lg shadow-hf-green/20">ชำระเงินตอนนี้</button>
+    </div>
+</main>
+
+<dialog id="qr-modal" class="modal">
+    <div class="modal-box bg-white p-8 rounded-3xl max-w-xs text-center">
+        <div class="text-5xl mb-4">📱</div>
+        <p class="font-bold text-lg mb-2">สแกน PromptPay</p>
+        <div class="bg-white p-4 border-2 border-hf-green rounded-2xl inline-block shadow-inner mb-4">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=HappyFoodPayment" class="w-40 h-40 rounded-lg" />
+        </div>
+        <p class="text-xs text-gray-400">ชื่อบัญชี: Happy Food Co., Ltd.</p>
+        <p id="qr-amount" class="text-2xl font-black text-neutral mt-2">฿0.00</p>
+        <button onclick="confirmPaymentDone()" class="btn btn-block bg-hf-green border-none text-white mt-6 rounded-xl">✅ ยืนยันว่าจ่ายแล้ว</button>
+    </div>
+</dialog>
+
+<dialog id="review-modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-white p-8 rounded-t-3xl sm:rounded-3xl">
+        <div class="text-center space-y-4">
+            <div class="text-6xl">😋</div>
+            <h3 class="font-bold text-2xl text-neutral">ทานให้อร่อยนะครับ!</h3>
+            <p class="text-sm text-gray-400">เราอยากฟังความรู้สึกของคุณเกี่ยวกับมื้อนี้</p>
+            <div class="rating rating-lg gap-1 mt-4" id="star-rating">
+                <input type="radio" name="rating" value="1" class="mask mask-star-2 bg-orange-400" />
+                <input type="radio" name="rating" value="2" class="mask mask-star-2 bg-orange-400" />
+                <input type="radio" name="rating" value="3" class="mask mask-star-2 bg-orange-400" checked />
+                <input type="radio" name="rating" value="4" class="mask mask-star-2 bg-orange-400" />
+                <input type="radio" name="rating" value="5" class="mask mask-star-2 bg-orange-400" />
+            </div>
+            <textarea id="review-text" rows="3" class="textarea textarea-bordered w-full bg-hf-bg border-gray-100 rounded-2xl mt-2 resize-none" placeholder="บอกเราหน่อยว่ารสชาติเป็นยังไงบ้าง..."></textarea>
+            <div class="flex flex-col gap-3 mt-4">
+                <button onclick="submitReview(true)" class="btn bg-hf-green border-none text-white rounded-2xl font-bold">ส่งรีวิว ✨</button>
+                <button onclick="submitReview(false)" class="btn btn-ghost text-gray-400 rounded-2xl">ข้ามไปเลย</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<script>
+let selectedMethod = 'promptpay';
+let currentOrder = null;
+let grandTotal = 0;
+
+async function init() {
+    console.log("💳 Initializing checkout...");
+    
+    if (typeof DB === 'undefined') {
+        console.error("❌ DB not loaded");
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+        return;
+    }
+
+    const tableId = DB.get(DB.KEYS.SELECTED_TABLE);
+    document.getElementById('table-badge').innerText = `Table ${tableId || '--'}`;
+
+    currentOrder = DB.getCurrentOrder();
+    if (!currentOrder) {
+        console.warn("⚠️ No order found, redirecting...");
+        window.location.href = '/menu-page';
+        return;
+    }
+
+    const container = document.getElementById('summary-items');
+    container.innerHTML = currentOrder.items.map(item => `
+        <div class="flex justify-between items-start text-sm">
+            <div class="flex-1">
+                <span class="font-medium text-neutral">${item.img} ${item.qty}× ${item.name}</span>
+                ${item.toppings && item.toppings.length ? `<p class="text-[11px] text-gray-400 mt-0.5">${item.toppings.join(', ')}</p>` : ''}
+                ${item.note ? `<p class="text-[11px] text-hf-green mt-0.5">📝 ${item.note}</p>` : ''}
+            </div>
+            <span class="font-bold text-neutral ml-4">฿${item.totalPrice}</span>
+        </div>`).join('');
+
+    // ✅ FIXED: currentOrder.subtotal is already in the response
+    const sub = currentOrder.subtotal;
+    const vat = sub * 0.07;
+    grandTotal = currentOrder.total; // total already includes VAT
+    
+    document.getElementById('subtotal').innerText = `฿${sub.toFixed(2)}`;
+    document.getElementById('vat').innerText = `฿${vat.toFixed(2)}`;
+    document.getElementById('grand-total').innerText = `฿${grandTotal.toFixed(2)}`;
+    document.getElementById('qr-amount').innerText = `฿${grandTotal.toFixed(2)}`;
+
+    const sessionId = localStorage.getItem('activeSessionId');
+    if (sessionId) {
+        const completed = JSON.parse(localStorage.getItem('completedSessions') || '[]');
+        if (!completed.includes(sessionId)) {
+            completed.push(sessionId);
+            localStorage.setItem('completedSessions', JSON.stringify(completed));
+        }
+    }
+}
+
+function selectPay(method, el) {
+    selectedMethod = method;
+    document.querySelectorAll('.pay-card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('input[name=pay]').forEach(r => r.checked = false);
+    el.classList.add('active');
+    el.querySelector('input').checked = true;
+}
+
+function processPayment() {
+    if (selectedMethod === 'promptpay') {
+        document.getElementById('qr-modal').showModal();
+    } else if (selectedMethod === 'cash') {
+        Swal.fire({
+            title:'เรียกพนักงาน',
+            text:'พนักงานกำลังนำบิลและรับชำระที่โต๊ะครับ',
+            icon:'info',
+            confirmButtonColor:'#A3B18A',
+            confirmButtonText:'รับทราบ'
+        }).then(() => confirmPaymentDone());
+    } else {
+        Swal.fire({
+            title:'กำลังหักเงินผ่านบัตร...',
+            timer:2000,
+            showConfirmButton:false,
+            didOpen:()=>Swal.showLoading()
+        }).then(() => confirmPaymentDone());
+    }
+}
+
+async function confirmPaymentDone() {
+    document.getElementById('qr-modal').close();
+    try {
+        await DB.markOrderPaid(currentOrder.id, selectedMethod);
+        console.log("✅ Order marked as paid");
+    } catch(e) { console.error(e); }
+
+    confetti({ particleCount:150, spread:70, origin:{y:.6}, colors:['#A3B18A','#344E41','#E9EDC9'] });
+    
+    setTimeout(() => {
+        document.getElementById('review-modal').showModal();
+    }, 1500);
+}
+
+async function submitReview(withReview) {
+    console.log("📝 Submitting review...");
+    
+    const sessionId = localStorage.getItem('activeSessionId');
+    const tableId = DB.get(DB.KEYS.SELECTED_TABLE);
+    
+    if (withReview) {
+        const rating = document.querySelector('input[name=rating]:checked')?.value || 3;
+        const comment = document.getElementById('review-text').value;
+        try {
+            await fetch('/reviews', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    orderId: currentOrder.id, 
+                    tableId: tableId, 
+                    rating: parseInt(rating), 
+                    comment, 
+                    sessionId 
+                })
+            });
+            console.log("✅ Review submitted");
+        } catch(e) { 
+            console.error("Review error:", e); 
+        }
+    }
+
+    // ✅ ปิด Review Modal
+    document.getElementById('review-modal').close();
+
+    // ✅ เด้งข้อความขอบคุณ
+    Swal.fire({
+        title:'ขอบคุณที่ใช้บริการ! 🙏',
+        text:'Happy Food ยินดีที่ได้ให้บริการคุณ',
+        icon:'success',
+        confirmButtonColor:'#A3B18A',
+        confirmButtonText:'ตกลง'
+    }).then(async () => {
+        // ✅ ปล่อยโต๊ะให้ว่าง
+        try {
+            await fetch(`/tables/${tableId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status: 'vacant', order_id: null })
+            });
+            console.log(`✅ Table ${tableId} released`);
+        } catch(e) { console.error("Release table error:", e); }
+
+        // ✅ ปิด Session
+        if (sessionId) {
+            try {
+                await fetch('/end-session', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sessionId })
+                });
+                console.log(`✅ Session closed: ${sessionId}`);
+            } catch(e) { console.error("End session error:", e); }
+        }
+
+        // ✅ ล้าง Storage
+        DB.set(DB.KEYS.SELECTED_TABLE, null);
+        DB.set(DB.KEYS.CURRENT_ORDER, null);
+        localStorage.removeItem('activeSessionId');
+        console.log("✅ Storage cleared");
+
+        // ✅ กลับไปหน้าโต๊ะ
+        console.log("🔄 Redirecting to table selection...");
+        window.location.href = '/';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("💳 Checkout page loading...");
+    
+    let attempts = 0;
+    while (typeof DB === 'undefined' && attempts < 100) {
+        await new Promise(r => setTimeout(r, 50));
+        attempts++;
+    }
+
+    if (typeof DB === 'undefined') {
+        console.error("❌ DB failed to load");
+        return;
+    }
+
+    await init();
+});
+</script>
+</body>
+</html>

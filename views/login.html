@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chef & Admin Portal - Happy Food</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/db-client.js"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { 'hf-green':'#A3B18A','hf-green-light':'#E9EDC9','hf-bg':'#F8F9FA' }}}}
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&display=swap');
+        body { font-family:'Noto Sans Thai',sans-serif; background:#F8F9FA; }
+        .input-minimal { border-color:#E9ECEF; background:#fff; transition:all .2s; }
+        .input-minimal:focus { border-color:#A3B18A; outline:none; box-shadow:0 0 0 3px rgba(163,177,138,.15); }
+        .form-fade { animation:fadeIn .35s ease-out; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-hf-bg">
+
+<header class="p-8 text-center">
+    <a href="/" class="text-3xl font-bold text-neutral">Happy<span class="text-hf-green">Food</span> Restaurant</a>
+    <p class="text-sm text-gray-400 mt-1">Staff Portal</p>
+</header>
+
+<main class="flex-grow flex items-center justify-center p-4 pb-16">
+    <div class="card w-full max-w-md bg-white shadow-xl shadow-black/[.04] border border-gray-100 rounded-3xl overflow-hidden">
+        
+        <div class="absolute top-6 left-6">
+            <a href="/" class="btn btn-ghost btn-circle btn-sm text-gray-300 hover:text-hf-green">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+            </a>
+        </div>
+
+        <div class="bg-gradient-to-br from-hf-green-light to-white p-8 text-center border-b border-gray-50">
+            <div class="text-6xl mb-3">👨‍🍳</div>
+            <h1 id="form-title" class="text-2xl font-bold text-neutral">Login Portal</h1>
+            <p id="form-sub" class="text-sm text-gray-400 mt-1">Welcome back, Chef & Admin.</p>
+        </div>
+
+        <div class="p-8">
+            <!-- Login Form -->
+            <form id="login-form" class="space-y-5 form-fade" onsubmit="handleLogin(event)">
+               
+                <div class="form-control">
+                    <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">Username</span></label>
+                    <input id="login-username" type="text" placeholder="your username" class="input input-bordered input-minimal w-full rounded-xl" required />
+                </div>
+                <div class="form-control">
+                    <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">Password</span></label>
+                    <input id="login-password" type="password" placeholder="••••••••" class="input input-bordered input-minimal w-full rounded-xl" required />
+                </div>
+                <div id="login-error" class="hidden text-red-500 text-xs bg-red-50 p-3 rounded-xl text-center font-medium">❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
+                <button type="submit" class="btn bg-hf-green border-none text-white hover:bg-hf-green-dark w-full rounded-xl mt-2 h-12 font-bold">Sign In →</button>
+                <div class="text-center text-sm">
+                    <span class="text-gray-400">New Chef?</span>
+                    <a href="#" onclick="toggleForm('register')" class="text-hf-green font-bold hover:underline ml-1">Create Account</a>
+                </div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="space-y-4 form-fade hidden" onsubmit="handleRegister(event)">
+                <!-- Step 1: ตรวจสอบ Cook ID -->
+                <div id="reg-step1">
+                    <div class="bg-blue-50 rounded-2xl p-4 text-xs text-blue-700 mb-4">
+                        <p class="font-bold">🎟️ รับ Cook ID จาก Admin ก่อน</p>
+                        <p class="mt-1 text-blue-500">Admin จะแจ้ง Cook ID ให้คุณก่อนสมัครได้</p>
+                    </div>
+                    <div class="form-control">
+                        <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">Cook ID (รับจาก Admin)</span></label>
+                        <div class="flex gap-2">
+                            <input id="reg-cookid" type="text" placeholder="เช่น CK-003" class="input input-bordered input-minimal flex-1 rounded-xl" required />
+                            <button type="button" onclick="verifyCookId()" class="btn bg-hf-green border-none text-white rounded-xl px-4 font-bold">ตรวจสอบ</button>
+                        </div>
+                    </div>
+                    <div id="reg-verify-result" class="hidden mt-3 p-3 rounded-xl text-sm text-center font-medium"></div>
+                </div>
+
+                <!-- Step 2: กรอก username/password (แสดงหลังตรวจสอบ Cook ID ผ่าน) -->
+                <div id="reg-step2" class="hidden space-y-4">
+                    <div id="reg-chef-info" class="bg-hf-green-light/60 rounded-2xl p-4 text-sm text-hf-green-dark text-center font-bold"></div>
+                    <div class="form-control">
+                        <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">Username</span></label>
+                        <input id="reg-username" type="text" placeholder="ตั้ง username" class="input input-bordered input-minimal w-full rounded-xl" required />
+                    </div>
+                    <div class="form-control">
+                        <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">Password</span></label>
+                        <input id="reg-password" type="password" placeholder="••••••••" class="input input-bordered input-minimal w-full rounded-xl" required minlength="6"/>
+                    </div>
+                    <div class="form-control">
+                        <label class="label pt-0"><span class="label-text text-gray-500 text-sm font-medium">ยืนยันรหัสผ่าน</span></label>
+                        <input id="reg-confirm" type="password" placeholder="••••••••" class="input input-bordered input-minimal w-full rounded-xl" required />
+                    </div>
+                </div>
+
+                <div id="reg-error" class="hidden text-red-500 text-xs bg-red-50 p-3 rounded-xl text-center font-medium"></div>
+                <button type="submit" id="reg-submit" class="btn bg-hf-green border-none text-white w-full rounded-xl mt-2 h-12 font-bold hidden">สมัครสมาชิก 👨‍🍳</button>
+                <div class="text-center text-sm">
+                    <span class="text-gray-400">มีบัญชีแล้ว?</span>
+                    <a href="#" onclick="toggleForm('login')" class="text-hf-green font-bold hover:underline ml-1">Login Instead</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleForm(type) {
+    const lf = document.getElementById('login-form'), rf = document.getElementById('register-form');
+    const title = document.getElementById('form-title'), sub = document.getElementById('form-sub');
+    if (type === 'register') {
+        lf.classList.add('hidden'); rf.classList.remove('hidden');
+        title.innerText = 'Chef Registration'; sub.innerText = 'Join our kitchen team!';
+    } else {
+        rf.classList.add('hidden'); lf.classList.remove('hidden');
+        title.innerText = 'Login Portal'; sub.innerText = 'Welcome back, Chef & Admin.';
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    try {
+        const user = await DB.login(username, password);
+        errEl.classList.add('hidden');
+        DB.setSession({ userId: user.id, role: user.role, name: user.name, cookId: user.cook_id });
+        if (user.role === 'admin') window.location.href = '/admin';
+        else window.location.href = '/kitchen';
+    } catch(err) {
+        errEl.classList.remove('hidden');
+    }
+}
+
+async function verifyCookId() {
+    const cookId = document.getElementById('reg-cookid').value.trim();
+    const resultEl = document.getElementById('reg-verify-result');
+    if (!cookId) return;
+    try {
+        const data = await DB.verifyInvite(cookId);
+        resultEl.className = 'mt-3 p-3 rounded-xl text-sm text-center font-medium bg-green-50 text-green-700';
+        resultEl.innerText = `✅ พบข้อมูล: ${data.name}`;
+        resultEl.classList.remove('hidden');
+        document.getElementById('reg-chef-info').innerText = `👨‍🍳 ยินดีต้อนรับ ${data.name} — กรุณาตั้ง Username และ Password`;
+        document.getElementById('reg-step2').classList.remove('hidden');
+        document.getElementById('reg-submit').classList.remove('hidden');
+        document.getElementById('reg-cookid').readOnly = true;
+    } catch(err) {
+        resultEl.className = 'mt-3 p-3 rounded-xl text-sm text-center font-medium bg-red-50 text-red-600';
+        resultEl.innerText = `❌ ${err.message}`;
+        resultEl.classList.remove('hidden');
+        document.getElementById('reg-step2').classList.add('hidden');
+        document.getElementById('reg-submit').classList.add('hidden');
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('reg-error');
+    const cookId = document.getElementById('reg-cookid').value.trim();
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm = document.getElementById('reg-confirm').value;
+    if (password !== confirm) {
+        errEl.innerText = '❌ รหัสผ่านไม่ตรงกัน';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    try {
+        errEl.classList.add('hidden');
+        await DB.addUser({ username, password, cookId });
+        Swal.fire({
+            title: 'ลงทะเบียนสำเร็จ! 🎉',
+            text: `ยินดีต้อนรับเข้าสู่ทีมครัวครับ`,
+            icon: 'success',
+            confirmButtonColor: '#A3B18A'
+        }).then(() => toggleForm('login'));
+    } catch(err) {
+        errEl.innerText = '❌ ' + err.message;
+        errEl.classList.remove('hidden');
+    }
+}
+
+window.onload = () => {
+    const s = DB.getSession();
+    if (s) {
+        if (s.role === 'admin') window.location.href = '/admin';
+        else window.location.href = '/kitchen';
+    }
+};
+</script>   
+</body>
+</html>

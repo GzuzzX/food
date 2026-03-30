@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Food Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: {
+                'hf-green':'#A3B18A','hf-green-dark':'#344E41',
+                'hf-green-light':'#E9EDC9','hf-bg':'#F8F9FA'
+            }}}
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&display=swap');
+        body { font-family:'Noto Sans Thai',sans-serif; background:#F8F9FA; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 260px; height: 100vh; background: white; border-right: 1px solid #e5e7eb; overflow-y: auto; z-index: 40; }
+        .main-content { margin-left: 260px; padding: 20px; }
+        .menu-item { display: block; padding: 12px 20px; text-decoration: none; color: #6b7280; border-left: 4px solid transparent; transition: all 0.3s; }
+        .menu-item:hover { background: #f3f4f6; color: #A3B18A; }
+        .menu-item.active { border-left-color: #A3B18A; background: #f0fdf4; color: #A3B18A; font-weight: 600; }
+        .stat-card { border-radius: 16px; padding: 20px; border: 1px solid #e5e7eb; }
+        .stat-card.green { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); }
+        .stat-card.red { background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); }
+        .stat-card.yellow { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
+        .stat-card.blue { background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); }
+    </style>
+</head>
+<body>
+
+<!-- ✅ SIDEBAR -->
+<div class="sidebar">
+    <div class="p-6 border-b border-gray-100">
+        <h1 class="text-2xl font-bold text-neutral">Happy<span class="text-hf-green">Food</span></h1>
+        <p class="text-xs text-gray-400 mt-2">Admin Dashboard</p>
+    </div>
+
+    <nav class="mt-6">
+        <a href="#dashboard" onclick="showPage('dashboard')" class="menu-item active" id="nav-dashboard">
+            <span class="text-lg mr-3">📊</span> Dashboard
+        </a>
+        <a href="#tables" onclick="showPage('tables')" class="menu-item" id="nav-tables">
+            <span class="text-lg mr-3">🪑</span> จัดการโต๊ะ
+        </a>
+        <a href="#menu" onclick="showPage('menu')" class="menu-item" id="nav-menu">
+            <span class="text-lg mr-3">🍽️</span> จัดการเมนู
+        </a>
+        <a href="#sales" onclick="showPage('sales')" class="menu-item" id="nav-sales">
+            <span class="text-lg mr-3">💰</span> ยอดขาย
+        </a>
+        <a href="#users" onclick="showPage('users')" class="menu-item" id="nav-users">
+            <span class="text-lg mr-3">👥</span> ผู้ใช้งาน
+        </a>
+        <a href="#history" onclick="showPage('history')" class="menu-item" id="nav-history">
+            <span class="text-lg mr-3">📋</span> ประวัติ
+        </a>
+    </nav>
+
+    <div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-100">
+        <button onclick="logout()" class="btn btn-block btn-outline rounded-xl text-sm">ออกจากระบบ</button>
+    </div>
+</div>
+
+<!-- ✅ MAIN CONTENT -->
+<div class="main-content">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h2 id="page-title" class="text-3xl font-bold text-neutral">Dashboard</h2>
+            <p id="page-subtitle" class="text-gray-400 mt-1">ยินดีต้อนรับ Admin</p>
+        </div>
+        <div class="flex gap-3 items-center">
+            <span id="time" class="text-sm text-gray-500"></span>
+            <div class="avatar placeholder">
+                <div class="bg-hf-green text-white rounded-full w-10">
+                    <span>A</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ DASHBOARD PAGE -->
+    <div id="page-dashboard" class="page-content">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card green">
+                <p class="text-sm text-green-600 font-bold uppercase">โต๊ะว่าง</p>
+                <p id="stat-vacant" class="text-4xl font-black text-green-700 mt-2">0</p>
+            </div>
+            <div class="stat-card red">
+                <p class="text-sm text-red-600 font-bold uppercase">โต๊ะใช้งาน</p>
+                <p id="stat-occupied" class="text-4xl font-black text-red-700 mt-2">0</p>
+            </div>
+            <div class="stat-card yellow">
+                <p class="text-sm text-yellow-600 font-bold uppercase">โต๊ะจัดเตรียม</p>
+                <p id="stat-cleaning" class="text-4xl font-black text-yellow-700 mt-2">0</p>
+            </div>
+            <div class="stat-card blue">
+                <p class="text-sm text-blue-600 font-bold uppercase">ยอดขายวนนี้</p>
+                <p id="stat-sales-today" class="text-3xl font-black text-blue-700 mt-2">฿0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-lg font-bold text-neutral mb-4">📈 ยอดขาย 7 วันล่าสุด</h3>
+                <canvas id="salesChart" height="80"></canvas>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-lg font-bold text-neutral mb-4">💳 ช่องทางชำระเงิน</h3>
+                <div id="payment-methods" class="space-y-3">
+                    <!-- render จาก JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-lg font-bold text-neutral mb-4">🔥 ออเดอร์ที่กำลังใช้งาน</h3>
+            <div id="active-orders" class="space-y-3">
+                <!-- render จาก JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ TABLES PAGE -->
+    <div id="page-tables" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-neutral">📊 สถานะโต๊ะทั้งหมด</h3>
+                <button onclick="showAddTableModal()" class="btn btn-sm bg-hf-green border-none text-white rounded-lg">+ เพิ่มโต๊ะ</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">โต๊ะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ความจุ</th>
+                            <th class="px-4 py-3 text-left font-bold">สถานะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ออเดอร์</th>
+                            <th class="px-4 py-3 text-left font-bold">อัปเดต</th>
+                            <th class="px-4 py-3 text-center font-bold">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ MENU PAGE -->
+    <div id="page-menu" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-neutral">🍽️ จัดการเมนูอาหาร</h3>
+                <button onclick="showAddMenuModal()" class="btn btn-sm bg-hf-green border-none text-white rounded-lg">+ เพิ่มเมนู</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">เมนู</th>
+                            <th class="px-4 py-3 text-left font-bold">หมวดหมู่</th>
+                            <th class="px-4 py-3 text-left font-bold">ราคา</th>
+                            <th class="px-4 py-3 text-left font-bold">สถานะ</th>
+                            <th class="px-4 py-3 text-center font-bold">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="menu-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ SALES PAGE -->
+    <div id="page-sales" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-xl font-bold text-neutral mb-6">💰 ยอดขายทั้งหมด</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">วันที่</th>
+                            <th class="px-4 py-3 text-left font-bold">โต๊ะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ยอดขาย</th>
+                            <th class="px-4 py-3 text-left font-bold">ช่องทาง</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ USERS PAGE -->
+    <div id="page-users" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-xl font-bold text-neutral mb-6">👥 ผู้ใช้งาน</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">Username</th>
+                            <th class="px-4 py-3 text-left font-bold">ชื่อ</th>
+                            <th class="px-4 py-3 text-left font-bold">บทบาท</th>
+                            <th class="px-4 py-3 text-left font-bold">สถานะ</th>
+                            <th class="px-4 py-3 text-center font-bold">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ HISTORY PAGE -->
+    <div id="page-history" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h3 class="text-xl font-bold text-neutral">📋 ประวัติทั้งหมด</h3>
+                <div class="flex gap-3 items-center flex-wrap">
+                    <input type="date" id="filter-date-start" class="input input-bordered rounded-xl" onchange="loadHistory()" />
+                    <span class="text-gray-400">ถึง</span>
+                    <input type="date" id="filter-date-end" class="input input-bordered rounded-xl" onchange="loadHistory()" />
+                    <button onclick="exportHistory()" class="btn btn-sm btn-outline border-hf-green text-hf-green rounded-lg">📥 ส่งออก</button>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="stats shadow-sm border border-gray-100 rounded-xl w-full">
+                    <div class="stat">
+                        <div class="stat-title text-xs">รวมทั้งสิ้น</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-total-records">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title text-xs">ยอดขายรวม</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-total-sales">฿0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title text-xs">จำนวนออเดอร์</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-total-orders">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title text-xs">เฉลี่ยต่อออเดอร์</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-avg-per-order">฿0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">วันที่-เวลา</th>
+                            <th class="px-4 py-3 text-left font-bold">โต๊ะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ออเดอร์</th>
+                            <th class="px-4 py-3 text-left font-bold">สินค้า</th>
+                            <th class="px-4 py-3 text-left font-bold">ยอดขาย</th>
+                            <th class="px-4 py-3 text-left font-bold">สถานะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ช่องทาง</th>
+                            <th class="px-4 py-3 text-center font-bold">ดูรายละเอียด</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ✅ Modal เพิ่มโต๊ะ -->
+<dialog id="add-table-modal" class="modal">
+    <div class="modal-box bg-white rounded-3xl max-w-sm">
+        <h3 class="font-bold text-lg text-neutral mb-4">➕ เพิ่มโต๊ะใหม่</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="text-sm font-bold text-gray-600">เบอร์โต๊ะ</label>
+                <input id="new-table-id" type="text" placeholder="01, 02, 03..." class="input input-bordered w-full rounded-xl mt-2" />
+            </div>
+            <div>
+                <label class="text-sm font-bold text-gray-600">ความจุ (คน)</label>
+                <input id="new-table-capacity" type="number" value="4" class="input input-bordered w-full rounded-xl mt-2" />
+            </div>
+        </div>
+        <div class="modal-action mt-6">
+            <button onclick="document.getElementById('add-table-modal').close()" class="btn btn-ghost rounded-xl">ยกเลิก</button>
+            <button onclick="addNewTable()" class="btn bg-hf-green border-none text-white rounded-xl">บันทึก</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- ✅ Modal เปลี่ยนสถานะ -->
+<dialog id="status-modal" class="modal">
+    <div class="modal-box bg-white rounded-3xl max-w-sm">
+        <h3 class="font-bold text-lg text-neutral mb-4" id="status-modal-title">เปลี่ยนสถานะโต๊ะ</h3>
+        <div class="space-y-3" id="status-buttons">
+            <!-- render จาก JS -->
+        </div>
+        <div class="modal-action mt-6">
+            <button onclick="document.getElementById('status-modal').close()" class="btn btn-ghost rounded-xl">ยกเลิก</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- ✅ Modal เพิ่มเมนู -->
+<dialog id="add-menu-modal" class="modal">
+    <div class="modal-box bg-white rounded-3xl max-w-md">
+        <h3 class="font-bold text-lg text-neutral mb-4">➕ เพิ่มเมนูใหม่</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="text-sm font-bold text-gray-600">ชื่อเมนู (ไทย)</label>
+                <input id="new-menu-name-th" type="text" class="input input-bordered w-full rounded-xl mt-2" />
+            </div>
+            <div>
+                <label class="text-sm font-bold text-gray-600">ชื่อเมนู (English)</label>
+                <input id="new-menu-name-en" type="text" class="input input-bordered w-full rounded-xl mt-2" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-sm font-bold text-gray-600">หมวดหมู่</label>
+                    <select id="new-menu-category" class="select select-bordered w-full rounded-xl mt-2">
+                        <option value="rice">จานเดียว</option>
+                        <option value="noodle">อาหารเส้น</option>
+                        <option value="drink">เครื่องดื่ม</option>
+                        <option value="dessert">ของหวาน</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-bold text-gray-600">ราคา</label>
+                    <input id="new-menu-price" type="number" class="input input-bordered w-full rounded-xl mt-2" />
+                </div>
+            </div>
+            <div>
+                <label class="text-sm font-bold text-gray-600">Emoji</label>
+                <input id="new-menu-emoji" type="text" value="🍽️" class="input input-bordered w-full rounded-xl mt-2" />
+            </div>
+        </div>
+        <div class="modal-action mt-6">
+            <button onclick="document.getElementById('add-menu-modal').close()" class="btn btn-ghost rounded-xl">ยกเลิก</button>
+            <button onclick="addNewMenu()" class="btn bg-hf-green border-none text-white rounded-xl">บันทึก</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- ✅ Modal ดูรายละเอียดออเดอร์ -->
+<dialog id="order-detail-modal" class="modal">
+    <div class="modal-box bg-white rounded-3xl max-w-2xl">
+        <h3 class="font-bold text-lg text-neutral mb-4">📋 รายละเอียดออเดอร์</h3>
+        <div class="space-y-4" id="order-detail-content">
+            <!-- render จาก JS -->
+        </div>
+        <div class="modal-action mt-6">
+            <button onclick="document.getElementById('order-detail-modal').close()" class="btn rounded-xl">ปิด</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+let allTables = {};
+let allMenus = [];
+let selectedTableId = null;
+let currentPage = 'dashboard';
+
+// ============================================================
+// PAGE MANAGEMENT
+// ============================================================
+
+function showPage(page) {
+    document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`page-${page}`).classList.remove('hidden');
+    
+    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(`nav-${page}`).classList.add('active');
+    
+    currentPage = page;
+    
+    const titles = {
+        dashboard: { title: 'Dashboard', subtitle: 'ยินดีต้อนรับ Admin' },
+        tables: { title: 'จัดการโต๊ะ', subtitle: 'สถานะโต๊ะทั้งหมด' },
+        menu: { title: 'จัดการเมนู', subtitle: 'จัดการรายการอาหาร' },
+        sales: { title: 'ยอดขาย', subtitle: 'รายงานยอดขาย' },
+        users: { title: 'ผู้ใช้งาน', subtitle: 'จัดการผู้ใช้งานระบบ' },
+        history: { title: 'ประวัติ', subtitle: 'ประวัติการสั่งซื้อทั้งหมด' }
+    };
+    
+    document.getElementById('page-title').innerText = titles[page].title;
+    document.getElementById('page-subtitle').innerText = titles[page].subtitle;
+    
+    if (page === 'tables') loadTables();
+    else if (page === 'menu') loadMenus();
+    else if (page === 'sales') loadSales();
+    else if (page === 'users') loadUsers();
+    else if (page === 'history') loadHistory();
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
+async function loadDashboard() {
+    try {
+        console.log("📊 Loading dashboard...");
+        const [tables, orders, sales] = await Promise.all([
+            fetch('/tables').then(r => r.json()),
+            fetch('/orders/active').then(r => r.json()),
+            fetch('/sales/today').then(r => r.json())
+        ]);
+
+        let vacant = 0, occupied = 0, cleaning = 0, totalSales = 0;
+        
+        Object.values(tables).forEach(t => {
+            if (t.status === 'vacant') vacant++;
+            else if (t.status === 'occupied') occupied++;
+            else if (t.status === 'cleaning') cleaning++;
+        });
+
+        sales.forEach(s => totalSales += parseFloat(s.total || 0));
+
+        document.getElementById('stat-vacant').innerText = vacant;
+        document.getElementById('stat-occupied').innerText = occupied;
+        document.getElementById('stat-cleaning').innerText = cleaning;
+        document.getElementById('stat-sales-today').innerText = `฿${totalSales.toFixed(2)}`;
+
+        // ✅ Active orders
+        const orderHtml = orders.slice(0, 5).map(o => `
+            <div class="flex justify-between items-center p-3 bg-hf-bg rounded-lg">
+                <div>
+                    <p class="font-bold text-neutral">Order #${o.id.substring(0, 8)}</p>
+                    <p class="text-xs text-gray-400">Table ${o.tableId}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold text-hf-green">฿${o.total.toFixed(2)}</p>
+                    <p class="text-xs text-gray-500">${o.status}</p>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('active-orders').innerHTML = orderHtml || '<p class="text-gray-400">ไม่มีออเดอร์</p>';
+
+    } catch (e) {
+        console.error("❌ Dashboard error:", e);
+    }
+}
+
+// ============================================================
+// TABLES
+// ============================================================
+
+async function loadTables() {
+    try {
+        console.log("📋 Loading tables...");
+        allTables = await fetch('/tables').then(r => r.json());
+        renderTables();
+    } catch (e) {
+        console.error("❌ Error loading tables:", e);
+    }
+}
+
+function renderTables() {
+    const tbody = document.getElementById('table-list');
+    tbody.innerHTML = '';
+
+    Object.entries(allTables).sort().forEach(([id, table]) => {
+        const statusBadge = {
+            'vacant': '<span class="badge badge-success">ว่าง</span>',
+            'occupied': '<span class="badge badge-error">ใช้งาน</span>',
+            'cleaning': '<span class="badge badge-warning">จัดเตรียม</span>'
+        }[table.status] || '<span class="badge">-</span>';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 font-bold">Table ${id}</td>
+            <td class="px-4 py-3">${table.capacity} คน</td>
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3 text-xs text-gray-500">${table.order_id || '-'}</td>
+            <td class="px-4 py-3 text-xs text-gray-500">${new Date(table.updated_at).toLocaleTimeString('th-TH')}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-2 justify-center">
+                    <button onclick="showStatusModal('${id}')" class="btn btn-xs btn-outline border-hf-green text-hf-green rounded-lg">เปลี่ยน</button>
+                    <button onclick="forceReleaseTable('${id}')" class="btn btn-xs btn-outline border-red-500 text-red-500 rounded-lg">ปล่อย</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function showAddTableModal() {
+    document.getElementById('new-table-id').value = '';
+    document.getElementById('new-table-capacity').value = '4';
+    document.getElementById('add-table-modal').showModal();
+}
+
+async function addNewTable() {
+    const id = document.getElementById('new-table-id').value.trim();
+    const capacity = parseInt(document.getElementById('new-table-capacity').value) || 4;
+
+    if (!id) {
+        Swal.fire('ข้อผิดพลาด', 'กรุณาระบุเบอร์โต๊ะ', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch('/tables', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table_id: id, table_name: `Table ${id}`, capacity })
+        });
+
+        if (!res.ok) throw new Error('ไม่สามารถเพิ่มโต๊ะได้');
+
+        Swal.fire('สำเร็จ', 'เพิ่มโต๊ะใหม่แล้ว', 'success');
+        document.getElementById('add-table-modal').close();
+        await loadTables();
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+function showStatusModal(tableId) {
+    selectedTableId = tableId;
+    document.getElementById('status-modal-title').innerText = `เปลี่ยนสถานะ Table ${tableId}`;
+    
+    const buttons = document.getElementById('status-buttons');
+    buttons.innerHTML = `
+        <button onclick="changeTableStatus('vacant')" class="btn btn-block bg-green-100 text-green-700 border-none rounded-xl font-bold">✓ ว่าง (Vacant)</button>
+        <button onclick="changeTableStatus('occupied')" class="btn btn-block bg-red-100 text-red-700 border-none rounded-xl font-bold">⚠️ ใช้งาน (Occupied)</button>
+        <button onclick="changeTableStatus('cleaning')" class="btn btn-block bg-yellow-100 text-yellow-700 border-none rounded-xl font-bold">🧹 จัดเตรียม (Cleaning)</button>
+    `;
+    
+    document.getElementById('status-modal').showModal();
+}
+
+async function changeTableStatus(status) {
+    if (!selectedTableId) return;
+
+    try {
+        const res = await fetch(`/tables/${selectedTableId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+
+        if (!res.ok) throw new Error('ไม่สามารถเปลี่ยนสถานะได้');
+
+        document.getElementById('status-modal').close();
+        await loadTables();
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function forceReleaseTable(tableId) {
+    Swal.fire({
+        title: 'ปล่อยโต๊ะ?',
+        text: `ต้องการปล่อย Table ${tableId} หรือ?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'ใช่ ปล่อยเลย',
+        cancelButtonText: 'ยกเลิก'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch(`/tables/${tableId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'vacant', order_id: null })
+            });
+
+            if (!res.ok) throw new Error('ไม่สามารถปล่อยโต๊ะได้');
+
+            Swal.fire('สำเร็จ', `ปล่อย Table ${tableId} แล้ว`, 'success');
+            await loadTables();
+        } catch (e) {
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        }
+    });
+}
+
+// ============================================================
+// MENU
+// ============================================================
+
+async function loadMenus() {
+    try {
+        console.log("🍽️ Loading menus...");
+        allMenus = await fetch('/menu/all').then(r => r.json());
+        renderMenus();
+    } catch (e) {
+        console.error("❌ Error loading menus:", e);
+    }
+}
+
+function renderMenus() {
+    const tbody = document.getElementById('menu-list');
+    tbody.innerHTML = '';
+
+    allMenus.forEach(menu => {
+        const statusBadge = menu.available 
+            ? '<span class="badge badge-success">พร้อม</span>'
+            : '<span class="badge badge-error">หมด</span>';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 font-bold">${menu.img} ${menu.name_th}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${menu.category}</td>
+            <td class="px-4 py-3 font-bold text-hf-green">฿${menu.price}</td>
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-2 justify-center">
+                    <button onclick="toggleMenuStatus('${menu.id}', ${!menu.available})" class="btn btn-xs btn-outline border-gray-300 rounded-lg">
+                        ${menu.available ? 'ปิด' : 'เปิด'}
+                    </button>
+                    <button onclick="deleteMenu('${menu.id}')" class="btn btn-xs btn-outline border-red-500 text-red-500 rounded-lg">ลบ</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function showAddMenuModal() {
+    document.getElementById('new-menu-name-th').value = '';
+    document.getElementById('new-menu-name-en').value = '';
+    document.getElementById('new-menu-price').value = '';
+    document.getElementById('new-menu-emoji').value = '🍽️';
+    document.getElementById('add-menu-modal').showModal();
+}
+
+async function addNewMenu() {
+    const name_th = document.getElementById('new-menu-name-th').value.trim();
+    const name = document.getElementById('new-menu-name-en').value.trim();
+    const category = document.getElementById('new-menu-category').value;
+    const price = parseFloat(document.getElementById('new-menu-price').value) || 0;
+    const img = document.getElementById('new-menu-emoji').value || '🍽️';
+
+    if (!name_th || !price) {
+        Swal.fire('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch('/menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, name_th, category, price, img })
+        });
+
+        if (!res.ok) throw new Error('ไม่สามารถเพิ่มเมนูได้');
+
+        Swal.fire('สำเร็จ', 'เพิ่มเมนูใหม่แล้ว', 'success');
+        document.getElementById('add-menu-modal').close();
+        await loadMenus();
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function toggleMenuStatus(menuId, available) {
+    try {
+        const res = await fetch(`/menu/${menuId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ available })
+        });
+
+        if (!res.ok) throw new Error('ไม่สามารถเปลี่ยนสถานะได้');
+
+        await loadMenus();
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function deleteMenu(menuId) {
+    Swal.fire({
+        title: 'ลบเมนู?',
+        text: 'ต้องการลบเมนูนี้หรือ?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'ใช่ ลบเลย',
+        cancelButtonText: 'ยกเลิก'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+
+        try {
+            console.log(`🗑️ Deleting menu ${menuId}...`);
+            const res = await fetch(`/menu/${menuId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) throw new Error('ไม่สามารถลบเมนูได้');
+
+            console.log(`✅ Menu ${menuId} deleted`);
+            Swal.fire('สำเร็จ', 'ลบเมนูแล้ว', 'success');
+            await loadMenus();
+        } catch (e) {
+            console.error("❌ Delete menu error:", e);
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        }
+    });
+}
+
+// ============================================================
+// SALES
+// ============================================================
+
+async function loadSales() {
+    try {
+        console.log("💰 Loading sales...");
+        const sales = await fetch('/sales').then(r => r.json());
+        renderSales(sales);
+    } catch (e) {
+        console.error("❌ Error loading sales:", e);
+    }
+}
+
+function renderSales(sales) {
+    const tbody = document.getElementById('sales-list');
+    tbody.innerHTML = '';
+
+    sales.slice(0, 100).forEach(sale => {
+        const paymentLabel = {
+            'promptpay': '🏦 PromptPay',
+            'card': '💳 บัตร',
+            'cash': '💵 เงินสด'
+        }[sale.payment_method] || '💰 ' + sale.payment_method;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 text-sm">${new Date(sale.created_at).toLocaleString('th-TH')}</td>
+            <td class="px-4 py-3 font-bold">Table ${sale.table_id}</td>
+            <td class="px-4 py-3 font-bold text-hf-green">฿${parseFloat(sale.total).toFixed(2)}</td>
+            <td class="px-4 py-3 text-sm">${paymentLabel}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+async function loadUsers() {
+    try {
+        console.log("👥 Loading users...");
+        const users = await fetch('/users').then(r => r.json());
+        renderUsers(users);
+    } catch (e) {
+        console.error("❌ Error loading users:", e);
+    }
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('users-list');
+    tbody.innerHTML = '';
+
+    users.forEach(user => {
+        const roleLabel = user.role === 'admin' ? '👨‍💼 Admin' : '👨‍🍳 เชฟ';
+        const statusBadge = user.is_active 
+            ? '<span class="badge badge-success">ใช้งาน</span>'
+            : '<span class="badge badge-error">ปิด</span>';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 font-bold">${user.username}</td>
+            <td class="px-4 py-3">${user.name}</td>
+            <td class="px-4 py-3">${roleLabel}</td>
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3 text-center">
+                ${user.role !== 'admin' ? `<button onclick="deleteUser('${user.id}')" class="btn btn-xs btn-outline border-red-500 text-red-500 rounded-lg">ลบ</button>` : '-'}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+async function deleteUser(userId) {
+    Swal.fire({
+        title: 'ลบผู้ใช้งาน?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'ใช่ ลบเลย'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch(`/users/${userId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('ไม่สามารถลบได้');
+            Swal.fire('สำเร็จ', 'ลบผู้ใช้งานแล้ว', 'success');
+            await loadUsers();
+        } catch (e) {
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        }
+    });
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+
+async function loadHistory() {
+    try {
+        console.log("📋 Loading order history...");
+        
+        const dateStart = document.getElementById('filter-date-start').value;
+        const dateEnd = document.getElementById('filter-date-end').value;
+
+        // ✅ Default: วันนี้
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = dateStart || today;
+        const endDate = dateEnd || today;
+
+        document.getElementById('filter-date-start').value = startDate;
+        document.getElementById('filter-date-end').value = endDate;
+
+        // ✅ ดึงทั้งหมด แล้วกรองในอพย์
+        const orders = await fetch('/orders').then(r => r.json());
+
+        // ✅ กรองตามวันที่
+        const filtered = orders.filter(o => {
+            const orderDate = o.createdAt.split('T')[0];
+            return orderDate >= startDate && orderDate <= endDate;
+        });
+
+        renderHistory(filtered);
+        calculateStats(filtered);
+
+    } catch (e) {
+        console.error("❌ Error loading history:", e);
+    }
+}
+
+function renderHistory(orders) {
+    const tbody = document.getElementById('history-list');
+    tbody.innerHTML = '';
+
+    orders.forEach(order => {
+        const itemCount = order.items?.length || 0;
+        const statusLabel = {
+            'pending': '⏳ รอปรุง',
+            'cooking': '🍳 กำลังปรุง',
+            'serving': '🍽️ เสิร์ฟแล้ว',
+            'paid': '✅ ชำระแล้ว',
+            'cancelled': '❌ ยกเลิก'
+        }[order.status] || order.status;
+
+        const paymentLabel = order.paid ? '✅ ชำระแล้ว' : '❌ รอชำระ';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 text-sm">${new Date(order.createdAt).toLocaleString('th-TH')}</td>
+            <td class="px-4 py-3 font-bold">Table ${order.tableId}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${order.id.substring(0, 10)}</td>
+            <td class="px-4 py-3 text-center">${itemCount} รายการ</td>
+            <td class="px-4 py-3 font-bold text-hf-green">฿${order.total.toFixed(2)}</td>
+            <td class="px-4 py-3 text-sm">${statusLabel}</td>
+            <td class="px-4 py-3 text-sm">${paymentLabel}</td>
+            <td class="px-4 py-3 text-center">
+                <button onclick="showOrderDetail('${order.id}')" class="btn btn-xs btn-outline border-hf-green text-hf-green rounded-lg">ดู</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function calculateStats(orders) {
+    let totalRecords = orders.length;
+    let totalSales = 0;
+    let totalOrders = 0;
+
+    orders.forEach(o => {
+        if (o.paid) {
+            totalSales += parseFloat(o.total || 0);
+            totalOrders++;
+        }
+    });
+
+    const avgPerOrder = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+    document.getElementById('history-total-records').innerText = totalRecords;
+    document.getElementById('history-total-sales').innerText = `฿${totalSales.toFixed(2)}`;
+    document.getElementById('history-total-orders').innerText = totalOrders;
+    document.getElementById('history-avg-per-order').innerText = `฿${avgPerOrder.toFixed(2)}`;
+}
+
+async function showOrderDetail(orderId) {
+    try {
+        const orders = await fetch('/orders').then(r => r.json());
+        const order = orders.find(o => o.id === orderId);
+        if (!order) return;
+
+        const itemsHtml = (order.items || []).map(item => `
+            <div class="bg-hf-bg p-3 rounded-lg">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <p class="font-bold">${item.img} ${item.name} × ${item.qty}</p>
+                        ${item.toppings?.length ? `<p class="text-xs text-gray-500 mt-1">${item.toppings.join(', ')}</p>` : ''}
+                        ${item.note ? `<p class="text-xs text-hf-green mt-1">📝 ${item.note}</p>` : ''}
+                    </div>
+                    <p class="font-bold text-hf-green ml-3">฿${item.totalPrice.toFixed(2)}</p>
+                </div>
+            </div>
+        `).join('');
+
+        const paymentLabel = order.paid ? '✅ ชำระแล้ว' : '❌ ยังไม่ชำระเงิน';
+
+        const content = `
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase">ออเดอร์</p>
+                        <p class="font-bold text-lg">${order.id}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase">โต๊ะ</p>
+                        <p class="font-bold text-lg">Table ${order.tableId}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase">วันที่-เวลา</p>
+                        <p class="font-bold">${new Date(order.createdAt).toLocaleString('th-TH')}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase">สถานะ</p>
+                        <p class="font-bold">${order.status}</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4">
+                    <p class="text-xs text-gray-400 uppercase font-bold mb-3">รายการอาหาร</p>
+                    <div class="space-y-2">
+                        ${itemsHtml}
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ยอดรวม (Subtotal)</span>
+                        <span class="font-bold">฿${order.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ภาษีมูลค่าเพิ่ม (7%)</span>
+                        <span class="font-bold">฿${order.subtotal ? (order.subtotal * 0.07).toFixed(2) : '0.00'}</span>
+                    </div>
+                    <div class="border-t border-gray-300 pt-2 flex justify-between">
+                        <span class="font-bold">ยอดสุทธิ</span>
+                        <span class="font-black text-lg text-hf-green">฿${order.total.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                <div class="bg-hf-green-light p-4 rounded-lg">
+                    <p class="text-xs text-gray-600">สถานะการชำระเงิน</p>
+                    <p class="font-bold text-hf-green-dark">${paymentLabel}</p>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('order-detail-content').innerHTML = content;
+        document.getElementById('order-detail-modal').showModal();
+
+    } catch (e) {
+        console.error("❌ Error showing order detail:", e);
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function exportHistory() {
+    try {
+        const dateStart = document.getElementById('filter-date-start').value;
+        const dateEnd = document.getElementById('filter-date-end').value;
+
+        const orders = await fetch('/orders').then(r => r.json());
+
+        const filtered = orders.filter(o => {
+            const orderDate = o.createdAt.split('T')[0];
+            return orderDate >= dateStart && orderDate <= dateEnd;
+        });
+
+        // ✅ สร้าง CSV
+        let csv = 'วันที่,เวลา,โต๊ะ,ออเดอร์,รายการ,ยอด,สถานะ,ชำระเงิน\n';
+        
+        filtered.forEach(o => {
+            const date = new Date(o.createdAt);
+            const dateStr = date.toLocaleDateString('th-TH');
+            const timeStr = date.toLocaleTimeString('th-TH');
+            const itemCount = o.items?.length || 0;
+            const paymentLabel = o.paid ? 'ชำระแล้ว' : 'รอชำระ';
+            
+            csv += `"${dateStr}","${timeStr}","${o.tableId}","${o.id}","${itemCount}","${o.total.toFixed(2)}","${o.status}","${paymentLabel}"\n`;
+        });
+
+        // ✅ ดาวน์โหลด
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `history_${dateStart}_to_${dateEnd}.csv`);
+        link.click();
+
+        Swal.fire('สำเร็จ', 'ส่งออกข้อมูลแล้ว', 'success');
+
+    } catch (e) {
+        console.error("❌ Export error:", e);
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function updateTime() {
+    const now = new Date();
+    document.getElementById('time').innerText = now.toLocaleTimeString('th-TH');
+}
+
+function logout() {
+    localStorage.clear();
+    window.location.href = '/login';
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+window.addEventListener('DOMContentLoaded', async () => {
+    console.log("📊 Admin dashboard loading...");
+    updateTime();
+    setInterval(updateTime, 1000);
+    
+    if (currentPage === 'dashboard') {
+        await loadDashboard();
+        setInterval(loadDashboard, 30000); // refresh ทุก 30 วินาที
+    }
+});
+</script>
+</body>
+</html>

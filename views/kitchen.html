@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display System - Happy Food</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/db-client.js" defer></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: {
+                'hf-green':'#A3B18A','hf-green-dark':'#344E41',
+                'hf-green-light':'#E9EDC9','hf-bg':'#F8F9FA'
+            }}}
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&display=swap');
+        body { font-family:'Noto Sans Thai',sans-serif; background:#F8F9FA; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 260px; height: 100vh; background: white; border-right: 1px solid #e5e7eb; overflow-y: auto; z-index: 40; }
+        .main-content { margin-left: 260px; padding: 20px; }
+        .menu-item { display: block; padding: 12px 20px; text-decoration: none; color: #6b7280; border-left: 4px solid transparent; transition: all 0.3s; }
+        .menu-item:hover { background: #f3f4f6; color: #A3B18A; }
+        .menu-item.active { border-left-color: #A3B18A; background: #f0fdf4; color: #A3B18A; font-weight: 600; }
+        .order-card { background: linear-gradient(135deg, #E9F5F0 0%, #E8F9FF 100%); border-left: 4px solid #A3B18A; transition: all 0.3s; }
+        .order-card.pending { border-left-color: #ef4444; background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); }
+        .order-card.cooking { border-left-color: #fbbf24; background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
+        .order-item { background: white; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    </style>
+</head>
+<body>
+
+<!-- ✅ SIDEBAR -->
+<div class="sidebar">
+    <div class="p-6 border-b border-gray-100">
+        <h1 class="text-2xl font-bold text-neutral">Happy<span class="text-hf-green">Food</span></h1>
+        <p class="text-xs text-gray-400 mt-2">Chef Panel</p>
+    </div>
+
+    <nav class="mt-6">
+        <a href="#kds" onclick="showPage('kds')" class="menu-item active" id="nav-kds">
+            <span class="text-lg mr-3">🍳</span> KDS
+        </a>
+        <a href="#history" onclick="showPage('history')" class="menu-item" id="nav-history">
+            <span class="text-lg mr-3">📋</span> ประวัติ
+        </a>
+    </nav>
+
+    <div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-100">
+        <button onclick="logout()" class="btn btn-block btn-outline rounded-xl text-sm">ออกจากระบบ</button>
+    </div>
+</div>
+
+<!-- ✅ MAIN CONTENT -->
+<div class="main-content">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h2 id="page-title" class="text-3xl font-bold text-neutral">Kitchen Display System</h2>
+            <p id="page-subtitle" class="text-gray-400 mt-1">ระบบแสดงผลในครัว</p>
+        </div>
+        <div class="flex gap-3 items-center">
+            <span id="time" class="text-sm text-gray-500"></span>
+            <div class="avatar placeholder">
+                <div class="bg-hf-green text-white rounded-full w-10">
+                    <span>C</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ KDS PAGE -->
+    <div id="page-kds" class="page-content">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <p class="text-sm text-red-600 font-bold uppercase">รอปรุง</p>
+                <p id="stat-pending" class="text-4xl font-black text-red-700 mt-2">0</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <p class="text-sm text-yellow-600 font-bold uppercase">กำลังปรุง</p>
+                <p id="stat-cooking" class="text-4xl font-black text-yellow-700 mt-2">0</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <p class="text-sm text-green-600 font-bold uppercase">พร้อมเสิร์ฟ</p>
+                <p id="stat-ready" class="text-4xl font-black text-green-700 mt-2">0</p>
+            </div>
+        </div>
+
+        <!-- ✅ Pending Orders -->
+        <div class="mb-8">
+            <h3 class="text-xl font-bold text-red-600 mb-4">⏳ รอปรุง</h3>
+            <div id="pending-orders" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- render จาก JS -->
+            </div>
+        </div>
+
+        <!-- ✅ Cooking Orders -->
+        <div class="mb-8">
+            <h3 class="text-xl font-bold text-yellow-600 mb-4">🍳 กำลังปรุง</h3>
+            <div id="cooking-orders" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- render จาก JS -->
+            </div>
+        </div>
+
+        <!-- ✅ Ready Orders -->
+        <div class="mb-8">
+            <h3 class="text-xl font-bold text-green-600 mb-4">✅ พร้อมเสิร์ฟ</h3>
+            <div id="ready-orders" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- render จาก JS -->
+            </div>
+        </div>
+
+        <div id="empty-msg" class="text-center py-20 text-gray-300">
+            <p class="text-5xl mb-3">😴</p>
+            <p class="text-lg">ไม่มีออเดอร์</p>
+        </div>
+    </div>
+
+    <!-- ✅ HISTORY PAGE -->
+    <div id="page-history" class="page-content hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h3 class="text-xl font-bold text-neutral">📋 ประวัติการทำอาหาร</h3>
+                <div class="flex gap-3 items-center flex-wrap">
+                    <input type="date" id="filter-date-start" class="input input-bordered rounded-xl" onchange="loadHistory()" />
+                    <span class="text-gray-400">ถึง</span>
+                    <input type="date" id="filter-date-end" class="input input-bordered rounded-xl" onchange="loadHistory()" />
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="stats shadow-sm border border-gray-100 rounded-xl w-full">
+                    <div class="stat">
+                        <div class="stat-title text-xs">รวมทั้งสิ้น</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-total-records">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title text-xs">เสร็จแล้ว</div>
+                        <div class="stat-value text-2xl text-hf-green" id="history-completed">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title text-xs">ยกเลิก</div>
+                        <div class="stat-value text-2xl text-red-600" id="history-cancelled">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-hf-bg border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold">วันที่-เวลา</th>
+                            <th class="px-4 py-3 text-left font-bold">โต๊ะ</th>
+                            <th class="px-4 py-3 text-left font-bold">ออเดอร์</th>
+                            <th class="px-4 py-3 text-left font-bold">รายการ</th>
+                            <th class="px-4 py-3 text-left font-bold">สถานะ</th>
+                            <th class="px-4 py-3 text-center font-bold">ดูรายละเอียด</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-list" class="divide-y divide-gray-100">
+                        <!-- render จาก JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ✅ Modal ดูรายละเอียด -->
+<dialog id="detail-modal" class="modal">
+    <div class="modal-box bg-white rounded-3xl max-w-md">
+        <h3 class="font-bold text-lg text-neutral mb-4">📋 รายละเอียดออเดอร์</h3>
+        <div id="detail-content" class="space-y-4">
+            <!-- render จาก JS -->
+        </div>
+        <div class="modal-action mt-6">
+            <button onclick="document.getElementById('detail-modal').close()" class="btn rounded-xl">ปิด</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+let allOrders = [];
+let currentPage = 'kds';
+let refreshInterval = null;
+
+// ============================================================
+// PAGE MANAGEMENT
+// ============================================================
+
+function showPage(page) {
+    document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`page-${page}`).classList.remove('hidden');
+    
+    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(`nav-${page}`).classList.add('active');
+    
+    currentPage = page;
+    
+    const titles = {
+        kds: { title: 'Kitchen Display System', subtitle: 'ระบบแสดงผลในครัว' },
+        history: { title: 'ประวัติการทำอาหาร', subtitle: 'บันทึกการทำอาหาร' }
+    };
+    
+    document.getElementById('page-title').innerText = titles[page].title;
+    document.getElementById('page-subtitle').innerText = titles[page].subtitle;
+    
+    if (page === 'history') loadHistory();
+}
+
+// ============================================================
+// KDS - LOAD & RENDER ORDERS
+// ============================================================
+
+async function loadOrders() {
+    try {
+        console.log("📋 Fetching orders from /orders/active...");
+        const response = await fetch('/orders/active');
+        
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        allOrders = await response.json();
+        console.log(`✅ Got ${allOrders.length} active orders`);
+        
+        if (currentPage === 'kds') {
+            renderOrders();
+            updateStats();
+        }
+    } catch (error) {
+        console.error("❌ Error loading orders:", error);
+    }
+}
+
+function renderOrders() {
+    const pending = allOrders.filter(o => o.status === 'pending');
+    const cooking = allOrders.filter(o => o.status === 'cooking');
+    const serving = allOrders.filter(o => o.status === 'serving');
+
+    renderOrderGroup('pending-orders', pending, 'pending');
+    renderOrderGroup('cooking-orders', cooking, 'cooking');
+    renderOrderGroup('ready-orders', serving, 'serving');
+
+    if (allOrders.length === 0) {
+        document.getElementById('empty-msg').classList.remove('hidden');
+    } else {
+        document.getElementById('empty-msg').classList.add('hidden');
+    }
+}
+
+function renderOrderGroup(containerId, orders, status) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    if (orders.length === 0) {
+        container.innerHTML = '<p class="text-gray-400 col-span-full text-center py-8">ไม่มีออเดอร์</p>';
+        return;
+    }
+
+    orders.forEach(order => {
+        const card = document.createElement('div');
+        card.className = `order-card p-4 rounded-xl cursor-pointer shadow-sm border border-gray-200 ${status === 'pending' ? 'pending' : status === 'cooking' ? 'cooking' : ''}`;
+        card.onclick = () => showOrderDetail(order);
+
+        const waitTime = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 1000 / 60);
+        const timeClass = waitTime > 20 ? 'text-red-600' : waitTime > 10 ? 'text-yellow-600' : 'text-gray-600';
+
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <p class="font-bold text-lg text-neutral">Table ${order.tableId}</p>
+                    <p class="text-xs text-gray-400">Order: ${order.id.substring(0, 8)}</p>
+                </div>
+                <div class="text-right">
+                    <div class="${timeClass} font-bold text-lg">${waitTime} นาที</div>
+                    <p class="text-xs text-gray-500 mt-1">${new Date(order.createdAt).toLocaleTimeString('th-TH')}</p>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 pt-3 mb-3">
+                <div class="space-y-2">
+                    ${(order.items || []).map(item => `
+                        <div class="order-item">
+                            <p class="font-bold text-neutral">${item.img} ${item.qty}× ${item.name}</p>
+                            ${item.note ? `<p class="text-xs text-hf-green mt-1">📝 ${item.note}</p>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                ${status === 'pending' ? `
+                    <button onclick="startCooking('${order.id}', event)" class="btn btn-sm bg-hf-green border-none text-white flex-1 rounded-lg font-bold">🔥 เริ่มปรุง</button>
+                    <button onclick="cancelOrder('${order.id}', event)" class="btn btn-sm btn-outline border-red-500 text-red-500 rounded-lg">❌</button>
+                ` : status === 'cooking' ? `
+                    <button onclick="readyServing('${order.id}', event)" class="btn btn-sm bg-hf-green border-none text-white flex-1 rounded-lg font-bold">✅ พร้อมเสิร์ฟ</button>
+                ` : `
+                    <span class="badge badge-success">✅ พร้อมเสิร์ฟ</span>
+                `}
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+function updateStats() {
+    document.getElementById('stat-pending').innerText = allOrders.filter(o => o.status === 'pending').length;
+    document.getElementById('stat-cooking').innerText = allOrders.filter(o => o.status === 'cooking').length;
+    document.getElementById('stat-ready').innerText = allOrders.filter(o => o.status === 'serving').length;
+}
+
+async function startCooking(orderId, event) {
+    event.stopPropagation();
+    
+    try {
+        console.log(`🔥 Starting cooking for order ${orderId}...`);
+        const res = await fetch(`/orders/${orderId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'cooking' })
+        });
+
+        if (!res.ok) throw new Error('Failed to update order');
+
+        console.log(`✅ Order ${orderId} now cooking`);
+        await loadOrders();
+    } catch (e) {
+        console.error("❌ Error:", e);
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function readyServing(orderId, event) {
+    event.stopPropagation();
+    
+    try {
+        console.log(`✅ Order ${orderId} ready to serve...`);
+        const res = await fetch(`/orders/${orderId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'serving' })
+        });
+
+        if (!res.ok) throw new Error('Failed to update order');
+
+        console.log(`✅ Order ${orderId} ready`);
+        await loadOrders();
+    } catch (e) {
+        console.error("❌ Error:", e);
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+async function cancelOrder(orderId, event) {
+    event.stopPropagation();
+    
+    Swal.fire({
+        title: 'ยกเลิกออเดอร์?',
+        text: 'คุณแน่ใจหรือ?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'ใช่ ยกเลิก',
+        cancelButtonText: 'ปิด'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+
+        try {
+            console.log(`❌ Cancelling order ${orderId}...`);
+            const res = await fetch(`/orders/${orderId}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Chef cancelled' })
+            });
+
+            if (!res.ok) throw new Error('Failed to cancel');
+
+            console.log(`✅ Order ${orderId} cancelled`);
+            Swal.fire('สำเร็จ', 'ยกเลิกออเดอร์แล้ว', 'success');
+            await loadOrders();
+        } catch (e) {
+            console.error("❌ Error:", e);
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        }
+    });
+}
+
+function showOrderDetail(order) {
+    const itemsHtml = (order.items || []).map(item => `
+        <div class="bg-hf-bg p-3 rounded-lg">
+            <p class="font-bold text-neutral">${item.img} ${item.qty}× ${item.name}</p>
+            ${item.toppings?.length ? `<p class="text-xs text-gray-500 mt-1">${item.toppings.join(', ')}</p>` : ''}
+            ${item.note ? `<p class="text-xs text-hf-green mt-2">📝 ${item.note}</p>` : ''}
+        </div>
+    `).join('');
+
+    document.getElementById('detail-content').innerHTML = `
+        <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <p class="text-gray-400 text-xs">โต๊ะ</p>
+                    <p class="text-xl font-bold text-hf-green">Table ${order.tableId}</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-xs">เวลา</p>
+                    <p class="text-sm text-gray-600">${new Date(order.createdAt).toLocaleTimeString('th-TH')}</p>
+                </div>
+            </div>
+            
+            <div>
+                <p class="text-gray-400 text-xs mb-2">รายการ</p>
+                <div class="space-y-2">
+                    ${itemsHtml}
+                </div>
+            </div>
+
+            <div class="bg-hf-green/10 p-3 rounded-lg border border-hf-green/30">
+                <p class="text-hf-green font-bold">รวม ${order.items?.length || 0} รายการ</p>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('detail-modal').showModal();
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+
+async function loadHistory() {
+    try {
+        console.log("📋 Loading order history...");
+        
+        const dateStart = document.getElementById('filter-date-start').value;
+        const dateEnd = document.getElementById('filter-date-end').value;
+
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = dateStart || today;
+        const endDate = dateEnd || today;
+
+        document.getElementById('filter-date-start').value = startDate;
+        document.getElementById('filter-date-end').value = endDate;
+
+        const orders = await fetch('/orders').then(r => r.json());
+
+        const filtered = orders.filter(o => {
+            const orderDate = o.createdAt.split('T')[0];
+            return orderDate >= startDate && orderDate <= endDate && o.status !== 'pending';
+        });
+
+        renderHistory(filtered);
+        calculateStats(filtered);
+
+    } catch (e) {
+        console.error("❌ Error loading history:", e);
+    }
+}
+
+function renderHistory(orders) {
+    const tbody = document.getElementById('history-list');
+    tbody.innerHTML = '';
+
+    orders.forEach(order => {
+        const itemCount = order.items?.length || 0;
+        const statusLabel = {
+            'cooking': '🍳 กำลังปรุง',
+            'serving': '🍽️ เสิร์ฟแล้ว',
+            'paid': '✅ เสร็จสิ้น',
+            'cancelled': '❌ ยกเลิก'
+        }[order.status] || order.status;
+
+        const statusColor = order.status === 'cancelled' ? 'badge-error' : 'badge-success';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3 text-sm">${new Date(order.createdAt).toLocaleString('th-TH')}</td>
+            <td class="px-4 py-3 font-bold">Table ${order.tableId}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${order.id.substring(0, 10)}</td>
+            <td class="px-4 py-3 text-center">${itemCount} รายการ</td>
+            <td class="px-4 py-3"><span class="badge ${statusColor}">${statusLabel}</span></td>
+            <td class="px-4 py-3 text-center">
+                <button onclick="showOrderDetail({id:'${order.id}', tableId:${order.tableId}, items:${JSON.stringify(order.items || []).replace(/"/g, '&quot;')}, createdAt:'${order.createdAt}'})" class="btn btn-xs btn-outline border-hf-green text-hf-green rounded-lg">ดู</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function calculateStats(orders) {
+    let totalRecords = orders.length;
+    let completed = orders.filter(o => o.status !== 'cancelled').length;
+    let cancelled = orders.filter(o => o.status === 'cancelled').length;
+
+    document.getElementById('history-total-records').innerText = totalRecords;
+    document.getElementById('history-completed').innerText = completed;
+    document.getElementById('history-cancelled').innerText = cancelled;
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function updateTime() {
+    const now = new Date();
+    document.getElementById('time').innerText = now.toLocaleTimeString('th-TH');
+}
+
+function logout() {
+    localStorage.clear();
+    window.location.href = '/login';
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+window.addEventListener('DOMContentLoaded', async () => {
+    console.log("🍳 Kitchen Display System loading...");
+    
+    // ✅ รอให้ DB โหลด
+    let attempts = 0;
+    while (typeof DB === 'undefined' && attempts < 100) {
+        await new Promise(r => setTimeout(r, 50));
+        attempts++;
+    }
+
+    if (typeof DB === 'undefined') {
+        console.error("❌ DB failed to load");
+        return;
+    }
+
+    console.log("✅ DB loaded");
+    
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    await loadOrders();
+    refreshInterval = setInterval(loadOrders, 5000);
+});
+
+window.addEventListener('beforeunload', () => {
+    if (refreshInterval) clearInterval(refreshInterval);
+});
+</script>
+</body>
+</html>
