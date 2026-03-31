@@ -43,32 +43,6 @@ const swaggerOptions = {
             username: { type: 'string', description: 'ชื่อผู้ใช้งาน' },
             name: { type: 'string', description: 'ชื่อเต็ม' },
             role: { type: 'string', enum: ['admin', 'chef', 'customer'], description: 'บทบาท' },
-            cook_id: { type: 'string', description: 'รหัสเชฟ' },
-          },
-        },
-        MenuItem: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            name: { type: 'string' },
-            name_th: { type: 'string' },
-            price: { type: 'number' },
-            category: { type: 'string' },
-            img: { type: 'string' },
-            available: { type: 'integer' },
-            toppings: { type: 'array', items: { type: 'string' } },
-          },
-        },
-        Order: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            tableId: { type: 'string' },
-            sessionId: { type: 'string' },
-            items: { type: 'array' },
-            total: { type: 'number' },
-            status: { type: 'string' },
-            paid: { type: 'integer' },
           },
         },
       },
@@ -133,13 +107,11 @@ app.get("/password/:raw", (req, res) => {
 //  🔑  AUTH (PUBLIC)
 // ============================================================
 
-const inviteCodes = {};
-
 /**
  * @swagger
  * /login:
  *   post:
- *     summary: เข้าสู่ระบบ (ทั้ง Admin, Chef, Customer)
+ *     summary: เข้าสู่ระบบ (Admin, Chef, Customer)
  *     tags: [🔑 Public Auth]
  *     requestBody:
  *       required: true
@@ -164,14 +136,14 @@ app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   try {
     const [results] = await pool.query(
-      "SELECT id, password, full_name AS name, role, cook_id FROM users WHERE username = ? AND is_active = TRUE",
+      "SELECT id, password, full_name AS name, role FROM users WHERE username = ? AND is_active = TRUE",
       [username]
     );
     if (results.length !== 1) return res.status(401).send("Wrong username or password");
     const same = argon2.verifySync(results[0].password, password);
     if (!same) return res.status(401).send("Wrong username or password");
-    const { id, name, role, cook_id } = results[0];
-    res.json({ id, name, role, cook_id });
+    const { id, name, role } = results[0];
+    res.json({ id, name, role });
   } catch (err) {
     console.error("❌ Login Error:", err);
     res.status(500).send("Database server error");
@@ -182,7 +154,7 @@ app.post("/login", async (req, res) => {
  * @swagger
  * /register:
  *   post:
- *     summary: ลงทะเบียนผู้ใช้ใหม่ (Chef)
+ *     summary: ลงทะเบียนเชฟใหม่
  *     tags: [🔑 Public Auth]
  *     requestBody:
  *       required: true
@@ -195,32 +167,36 @@ app.post("/login", async (req, res) => {
  *                 type: string
  *               password:
  *                 type: string
- *               cook_id:
+ *               full_name:
  *                 type: string
  *     responses:
  *       200:
  *         description: ลงทะเบียนสำเร็จ
  */
 app.post("/register", async (req, res) => {
-  const { username, password, cook_id } = req.body;
-  if (!username || !password || !cook_id)
+  const { username, password, full_name } = req.body;
+  if (!username || !password || !full_name)
     return res.status(400).send("กรุณากรอกข้อมูลให้ครบ");
-
-  const code = inviteCodes[cook_id];
-  if (!code) return res.status(403).send("ไม่พบ Cook ID นี้ กรุณาติดต่อ Admin");
-  if (code.usedBy) return res.status(410).send("Cook ID นี้ถูกใช้สมัครแล้ว");
 
   try {
     const [rows] = await pool.query("SELECT id FROM users WHERE username = ?", [username]);
     if (rows.length > 0) return res.status(409).send("Username นี้มีผู้ใช้งานแล้ว");
+    
     const hashed = argon2.hashSync(password);
+    const chefId = `CHF-${Date.now()}`;
+    
     await pool.query(
-      "INSERT INTO users (id, username, password, full_name, role, cook_id) VALUES (?,?,?,?,'chef',?)",
-      [cook_id, username, hashed, code.name, cook_id]
+      "INSERT INTO users (id, username, password, full_name, role, is_active) VALUES (?,?,?,?,'chef',TRUE)",
+      [chefId, username, hashed, full_name]
     );
-    inviteCodes[cook_id].usedBy = username;
-    delete inviteCodes[cook_id];
-    res.send("ลงทะเบียนสำเร็จ");
+    
+    res.json({ 
+      id: chefId,
+      username, 
+      full_name, 
+      role: 'chef',
+      message: "ลงทะเบียนสำเร็จ" 
+    });
   } catch (err) {
     console.error("❌ Register Error:", err);
     res.status(500).send("Database server error");
@@ -230,82 +206,6 @@ app.post("/register", async (req, res) => {
 // ============================================================
 //  👨‍💼 ADMIN ENDPOINTS
 // ============================================================
-
-/**
- * @swagger
- * /admin/invite:
- *   post:
- *     summary: สร้างรหัสเชิญสำหรับเชฟ
- *     tags: [👨‍💼 Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               cook_id:
- *                 type: string
- *                 example: CHF-001
- *               name:
- *                 type: string
- *                 example: Chef John
- *     responses:
- *       200:
- *         description: สร้างสำเร็จ
- */
-app.post("/admin/invite", async (req, res) => {
-  const { cook_id, name } = req.body;
-  if (!cook_id || !name) return res.status(400).send("กรุณาระบุ Cook ID และชื่อเชฟ");
-  try {
-    const [existing] = await pool.query("SELECT id FROM users WHERE id = ?", [cook_id]);
-    if (existing.length > 0) return res.status(409).send("Cook ID นี้มีในระบบแล้ว");
-    if (inviteCodes[cook_id]) return res.status(409).send("Cook ID นี้ถูกสร้างรหัสเชิญแล้ว รอเชฟสมัครอยู่");
-    inviteCodes[cook_id] = { name, usedBy: null, createdAt: new Date().toISOString() };
-    res.json({ cook_id, name, message: "สร้างรหัสเชิญสำเร็จ" });
-  } catch (err) {
-    console.error("❌ Invite Error:", err);
-    res.status(500).send("Server error");
-  }
-});
-
-/**
- * @swagger
- * /admin/invite:
- *   get:
- *     summary: ดึงรหัสเชิญทั้งหมด
- *     tags: [👨‍💼 Admin]
- *     responses:
- *       200:
- *         description: รายชื่อรหัสเชิญ
- */
-app.get("/admin/invite", (_req, res) => {
-  const list = Object.entries(inviteCodes).map(([cook_id, v]) => ({ cook_id, ...v }));
-  res.json(list);
-});
-
-/**
- * @swagger
- * /admin/invite/{cook_id}:
- *   delete:
- *     summary: ยกเลิกรหัสเชิญ
- *     tags: [👨‍💼 Admin]
- *     parameters:
- *       - in: path
- *         name: cook_id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: ยกเลิกสำเร็จ
- */
-app.delete("/admin/invite/:cook_id", (req, res) => {
-  const { cook_id } = req.params;
-  if (!inviteCodes[cook_id]) return res.status(404).send("ไม่พบรหัสเชิญนี้");
-  delete inviteCodes[cook_id];
-  res.send("ยกเลิกรหัสเชิญแล้ว");
-});
 
 /**
  * @swagger
@@ -320,10 +220,78 @@ app.delete("/admin/invite/:cook_id", (req, res) => {
 app.get("/admin/users", async (_req, res) => {
   try {
     const [results] = await pool.query(
-      "SELECT id, username, full_name AS name, role, cook_id, is_active, created_at FROM users ORDER BY created_at"
+      "SELECT id, username, full_name AS name, role, is_active, created_at FROM users ORDER BY created_at"
     );
     res.json(results);
   } catch (err) {
+    res.status(500).send("Database server error");
+  }
+});
+
+/**
+ * @swagger
+ * /admin/users:
+ *   post:
+ *     summary: สร้าง Admin, Chef หรือ Customer ใหม่
+ *     tags: [👨‍💼 Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: admin1
+ *               password:
+ *                 type: string
+ *                 example: password123
+ *               full_name:
+ *                 type: string
+ *                 example: Administrator
+ *               role:
+ *                 type: string
+ *                 enum: [admin, chef, customer]
+ *                 example: admin
+ *     responses:
+ *       201:
+ *         description: สร้างสำเร็จ
+ *       409:
+ *         description: Username มีอยู่แล้ว
+ */
+app.post("/admin/users", async (req, res) => {
+  const { username, password, full_name, role } = req.body;
+  
+  if (!username || !password || !full_name || !role) {
+    return res.status(400).send("กรุณากรอกข้อมูลให้ครบ");
+  }
+  
+  if (!['admin', 'customer', 'chef'].includes(role)) {
+    return res.status(400).send("Role ต้องเป็น admin, customer หรือ chef เท่านั้น");
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT id FROM users WHERE username = ?", [username]);
+    if (rows.length > 0) return res.status(409).send("Username นี้มีผู้ใช้งานแล้ว");
+    
+    const hashed = argon2.hashSync(password);
+    const userId = `${role.toUpperCase()}-${Date.now()}`;
+    
+    await pool.query(
+      "INSERT INTO users (id, username, password, full_name, role, is_active) VALUES (?,?,?,?,?,TRUE)",
+      [userId, username, hashed, full_name, role]
+    );
+    
+    res.status(201).json({ 
+      id: userId, 
+      username, 
+      full_name, 
+      role, 
+      message: "สร้างผู้ใช้งานสำเร็จ" 
+    });
+  } catch (err) {
+    console.error("❌ Create User Error:", err);
     res.status(500).send("Database server error");
   }
 });
@@ -582,6 +550,166 @@ app.get("/admin/sessions/count", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /admin/menu:
+ *   post:
+ *     summary: เพิ่มรายการอาหารใหม่
+ *     tags: [👨‍💼 Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               name_th:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               img:
+ *                 type: string
+ *               toppings:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: เพิ่มสำเร็จ
+ */
+app.post("/admin/menu", async (req, res) => {
+  const { name, name_th, category, price, toppings, img } = req.body;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [catRow] = await conn.query("SELECT id FROM menu_categories WHERE code = ?", [category]);
+    if (!catRow.length) { await conn.rollback(); return res.status(400).send("Invalid category"); }
+
+    const newId = `MN-${Date.now()}`;
+    await conn.query(
+      "INSERT INTO menu_items (id, category_id, name_th, name_en, price, emoji) VALUES (?,?,?,?,?,?)",
+      [newId, catRow[0].id, name_th || name, name || name_th, parseFloat(price) || 0, img || "🍽️"]
+    );
+
+    const tops = Array.isArray(toppings) ? toppings : [];
+    for (let i = 0; i < tops.length; i++) {
+      const t = tops[i];
+      const m = String(t).match(/\(\s*\+\s*([\d.]+)\s*\)/);
+      const extra = m ? parseFloat(m[1]) : 0;
+      const nameTh = String(t).replace(/\s*\(\s*\+\s*[\d.]+\s*\)/, "").trim();
+      await conn.query(
+        "INSERT INTO menu_toppings (menu_id, name_th, extra_price, sort_order) VALUES (?,?,?,?)",
+        [newId, nameTh, extra, i]
+      );
+    }
+    await conn.commit();
+    res.json({ id: newId, name_th: name_th || name, category, price: parseFloat(price) || 0, toppings: tops, img: img || "🍽️", available: 1 });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).send("Database server error");
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * @swagger
+ * /admin/menu/{id}:
+ *   put:
+ *     summary: แก้ไขรายการอาหาร
+ *     tags: [👨‍💼 Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: แก้ไขสำเร็จ
+ */
+app.put("/admin/menu/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name_th, nameTh, name, category, price, toppings, img, available } = req.body;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const fields = [], vals = [];
+
+    const thName = name_th || nameTh;
+    if (thName)    { fields.push("name_th = ?");      vals.push(thName); }
+    if (name)      { fields.push("name_en = ?");      vals.push(name); }
+    if (price !== undefined) { fields.push("price = ?"); vals.push(parseFloat(price)); }
+    if (img)       { fields.push("emoji = ?");        vals.push(img); }
+    if (available !== undefined) { fields.push("is_available = ?"); vals.push(available ? 1 : 0); }
+
+    if (category) {
+      const [catRow] = await conn.query("SELECT id FROM menu_categories WHERE code = ?", [category]);
+      if (catRow.length) { fields.push("category_id = ?"); vals.push(catRow[0].id); }
+    }
+
+    if (fields.length) {
+      vals.push(id);
+      await conn.query(`UPDATE menu_items SET ${fields.join(", ")} WHERE id = ?`, vals);
+    }
+
+    if (Array.isArray(toppings)) {
+      await conn.query("DELETE FROM menu_toppings WHERE menu_id = ?", [id]);
+      for (let i = 0; i < toppings.length; i++) {
+        const t = toppings[i];
+        const m = String(t).match(/\(\s*\+\s*([\d.]+)\s*\)/);
+        const extra = m ? parseFloat(m[1]) : 0;
+        const nameTh2 = String(t).replace(/\s*\(\s*\+\s*[\d.]+\s*\)/, "").trim();
+        await conn.query(
+          "INSERT INTO menu_toppings (menu_id, name_th, extra_price, sort_order) VALUES (?,?,?,?)",
+          [id, nameTh2, extra, i]
+        );
+      }
+    }
+    await conn.commit();
+    res.send("Update successfully");
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).send("Database server error");
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * @swagger
+ * /admin/menu/{id}:
+ *   delete:
+ *     summary: ลบรายการอาหาร
+ *     tags: [👨‍💼 Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: ลบสำเร็จ
+ */
+app.delete("/admin/menu/:id", async (req, res) => {
+  try {
+    const [result] = await pool.query("UPDATE menu_items SET is_deleted = TRUE WHERE id = ?", [req.params.id]);
+    if (result.affectedRows !== 1) return res.status(404).send("Menu not found");
+    res.send("Delete successfully");
+  } catch (err) {
+    res.status(500).send("Database server error");
+  }
+});
+
 // ============================================================
 //  👨‍🍳 CHEF ENDPOINTS
 // ============================================================
@@ -678,7 +806,7 @@ app.patch("/chef/orders/:id/status", async (req, res) => {
  *     tags: [👤 Customer]
  *     responses:
  *       200:
- *         description: รายการอ���หาร
+ *         description: รายการอาหาร
  */
 app.get("/customer/menu", async (_req, res) => {
   try {
@@ -691,9 +819,9 @@ app.get("/customer/menu", async (_req, res) => {
 
 /**
  * @swagger
- * /customer/tables:
+ * /customer/tables/{id}:
  *   patch:
- *     summary: อัปเดตสถานะโต๊ะ (ลูกค้า)
+ *     summary: อัปเดตสถานะโต๊ะ
  *     tags: [👤 Customer]
  *     parameters:
  *       - in: path
@@ -1305,7 +1433,7 @@ app.get("/customer/payments", async (req, res) => {
 });
 
 // ============================================================
-//  🍽️  MENU MANAGEMENT (ADMIN)
+//  HELPER FUNCTIONS
 // ============================================================
 
 function formatMenuItem(m) {
@@ -1342,170 +1470,6 @@ function parseToppings(raw) {
   if (!raw) return [];
   return raw.split('||').map(t => t.trim()).filter(Boolean);
 }
-
-/**
- * @swagger
- * /admin/menu:
- *   post:
- *     summary: เพิ่มรายการอาหารใหม่
- *     tags: [👨‍💼 Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               name_th:
- *                 type: string
- *               category:
- *                 type: string
- *               price:
- *                 type: number
- *               img:
- *                 type: string
- *               toppings:
- *                 type: array
- *     responses:
- *       200:
- *         description: เพิ่มสำเร็จ
- */
-app.post("/admin/menu", async (req, res) => {
-  const { name, name_th, category, price, toppings, img } = req.body;
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [catRow] = await conn.query("SELECT id FROM menu_categories WHERE code = ?", [category]);
-    if (!catRow.length) { await conn.rollback(); return res.status(400).send("Invalid category"); }
-
-    const newId = `MN-${Date.now()}`;
-    await conn.query(
-      "INSERT INTO menu_items (id, category_id, name_th, name_en, price, emoji) VALUES (?,?,?,?,?,?)",
-      [newId, catRow[0].id, name_th || name, name || name_th, parseFloat(price) || 0, img || "🍽️"]
-    );
-
-    const tops = Array.isArray(toppings) ? toppings : [];
-    for (let i = 0; i < tops.length; i++) {
-      const t = tops[i];
-      const m = String(t).match(/\(\s*\+\s*([\d.]+)\s*\)/);
-      const extra = m ? parseFloat(m[1]) : 0;
-      const nameTh = String(t).replace(/\s*\(\s*\+\s*[\d.]+\s*\)/, "").trim();
-      await conn.query(
-        "INSERT INTO menu_toppings (menu_id, name_th, extra_price, sort_order) VALUES (?,?,?,?)",
-        [newId, nameTh, extra, i]
-      );
-    }
-    await conn.commit();
-    res.json({ id: newId, name_th: name_th || name, category, price: parseFloat(price) || 0, toppings: tops, img: img || "🍽️", available: 1 });
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).send("Database server error");
-  } finally {
-    conn.release();
-  }
-});
-
-/**
- * @swagger
- * /admin/menu/{id}:
- *   put:
- *     summary: แก้ไขรายการอาหาร
- *     tags: [👨‍💼 Admin]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: แก้ไขสำเร็จ
- */
-app.put("/admin/menu/:id", async (req, res) => {
-  const { id } = req.params;
-  const { name_th, nameTh, name, category, price, toppings, img, available } = req.body;
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const fields = [], vals = [];
-
-    const thName = name_th || nameTh;
-    if (thName)    { fields.push("name_th = ?");      vals.push(thName); }
-    if (name)      { fields.push("name_en = ?");      vals.push(name); }
-    if (price !== undefined) { fields.push("price = ?"); vals.push(parseFloat(price)); }
-    if (img)       { fields.push("emoji = ?");        vals.push(img); }
-    if (available !== undefined) { fields.push("is_available = ?"); vals.push(available ? 1 : 0); }
-
-    if (category) {
-      const [catRow] = await conn.query("SELECT id FROM menu_categories WHERE code = ?", [category]);
-      if (catRow.length) { fields.push("category_id = ?"); vals.push(catRow[0].id); }
-    }
-
-    if (fields.length) {
-      vals.push(id);
-      await conn.query(`UPDATE menu_items SET ${fields.join(", ")} WHERE id = ?`, vals);
-    }
-
-    if (Array.isArray(toppings)) {
-      await conn.query("DELETE FROM menu_toppings WHERE menu_id = ?", [id]);
-      for (let i = 0; i < toppings.length; i++) {
-        const t = toppings[i];
-        const m = String(t).match(/\(\s*\+\s*([\d.]+)\s*\)/);
-        const extra = m ? parseFloat(m[1]) : 0;
-        const nameTh2 = String(t).replace(/\s*\(\s*\+\s*[\d.]+\s*\)/, "").trim();
-        await conn.query(
-          "INSERT INTO menu_toppings (menu_id, name_th, extra_price, sort_order) VALUES (?,?,?,?)",
-          [id, nameTh2, extra, i]
-        );
-      }
-    }
-    await conn.commit();
-    res.send("Update successfully");
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).send("Database server error");
-  } finally {
-    conn.release();
-  }
-});
-
-/**
- * @swagger
- * /admin/menu/{id}:
- *   delete:
- *     summary: ลบรายการอาหาร
- *     tags: [👨‍💼 Admin]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: ลบสำเร็จ
- */
-app.delete("/admin/menu/:id", async (req, res) => {
-  try {
-    const [result] = await pool.query("UPDATE menu_items SET is_deleted = TRUE WHERE id = ?", [req.params.id]);
-    if (result.affectedRows !== 1) return res.status(404).send("Menu not found");
-    res.send("Delete successfully");
-  } catch (err) {
-    res.status(500).send("Database server error");
-  }
-});
-
-// ============================================================
-//  HELPER FUNCTIONS
-// ============================================================
 
 async function fetchOrdersWithItems(whereClause = "") {
   const [orders] = await pool.query(
@@ -1638,6 +1602,8 @@ app.listen(PORT, () => {
 ║  👨‍💼 Admin Routes:    /admin/*                           ║
 ║  👨‍🍳 Chef Routes:     /chef/*                            ║
 ║  👤 Customer Routes: /customer/*                       ║
+║                                                        ║
+║  ✅ ใช้แค่ ID เพียงอย่างเดียว (ไม่มี cook_id)           ║
 ╚════════════════════════════════════════════════════════╝
   `);
 });
