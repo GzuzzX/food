@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 30, 2026 at 06:04 PM
+-- Generation Time: Mar 31, 2026 at 11:25 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -76,10 +76,11 @@ CREATE TABLE `customer_sessions` (
 --
 
 INSERT INTO `customer_sessions` (`session_id`, `table_id`, `is_active`, `created_at`, `ended_at`) VALUES
-('0e438573-1e04-4de7-a246-ed204854459d', '02', 1, '2026-03-30 22:31:08', NULL),
+('0e438573-1e04-4de7-a246-ed204854459d', '02', 0, '2026-03-30 22:31:08', '2026-04-01 00:13:01'),
 ('168979b6-ebf1-4946-918d-17217c2c9921', '01', 0, '2026-03-30 20:50:37', '2026-03-30 20:50:46'),
 ('264e33aa-0450-4614-b224-a62fc955a398', '02', 0, '2026-03-30 22:21:29', '2026-03-30 22:26:24'),
 ('26f2eca5-d3a9-4115-bd11-0a85bcc3464d', '01', 0, '2026-03-30 20:47:26', '2026-03-30 20:47:48'),
+('2f86da32-8456-4a90-9a5d-d7083581d4ba', '01', 0, '2026-04-01 00:28:02', '2026-04-01 00:28:43'),
 ('3061faac-0d21-4728-b18e-9767361b7662', '01', 0, '2026-03-30 21:05:23', '2026-03-30 21:05:32'),
 ('33cfe642-c70d-4723-84a7-3adf8a657ebb', '01', 0, '2026-03-30 21:05:46', '2026-03-30 21:05:55'),
 ('3c21fe42-6641-45e2-8f9e-3250b627d275', '01', 0, '2026-03-30 22:10:31', '2026-03-30 22:10:39'),
@@ -228,7 +229,8 @@ INSERT INTO `orders` (`id`, `table_id`, `session_id`, `status`, `subtotal`, `vat
 ('ORD-1774878452472', '01', '26f2eca5-d3a9-4115-bd11-0a85bcc3464d', '', 70.00, 7.00, 4.90, 74.90, 0, NULL, '2026-03-30 20:47:32', NULL, '2026-03-30 21:27:31'),
 ('ORD-1774878681418', '02', '88fde036-3b66-4038-a00a-e7c6303db1f0', '', 70.00, 7.00, 4.90, 74.90, 0, NULL, '2026-03-30 20:51:21', NULL, '2026-03-30 21:27:32'),
 ('ORD-1774879551529', '01', '33cfe642-c70d-4723-84a7-3adf8a657ebb', '', 120.00, 7.00, 8.40, 128.40, 0, NULL, '2026-03-30 21:05:51', NULL, '2026-03-30 21:27:32'),
-('ORD-1774883640660', '02', '6019f982-822e-4c9b-88e3-65cf69f0b69c', 'pending', 150.00, 7.00, 10.50, 160.50, 0, NULL, '2026-03-30 22:14:00', NULL, '2026-03-30 22:14:00');
+('ORD-1774883640660', '02', '6019f982-822e-4c9b-88e3-65cf69f0b69c', 'pending', 150.00, 7.00, 10.50, 160.50, 0, NULL, '2026-03-30 22:14:00', NULL, '2026-03-30 22:14:00'),
+('ORD-1774978108376', '01', '2f86da32-8456-4a90-9a5d-d7083581d4ba', 'pending', 150.00, 7.00, 10.50, 160.50, 0, NULL, '2026-04-01 00:28:28', NULL, '2026-04-01 00:28:28');
 
 -- --------------------------------------------------------
 
@@ -258,7 +260,8 @@ INSERT INTO `order_items` (`id`, `order_id`, `menu_id`, `menu_name_th`, `unit_pr
 (2, 'ORD-1774878452472', 'MN-004', 'ราดหน้าหมูนุ่ม', 70.00, 1, 0.00, 70.00, NULL, '2026-03-30 20:47:32'),
 (3, 'ORD-1774878681418', 'MN-004', 'ราดหน้าหมูนุ่ม', 70.00, 1, 0.00, 70.00, NULL, '2026-03-30 20:51:21'),
 (4, 'ORD-1774879551529', 'MN-006', 'ต้มยำกุ้งน้ำข้น', 120.00, 1, 0.00, 120.00, NULL, '2026-03-30 21:05:51'),
-(5, 'ORD-1774883640660', 'MN-006', 'ต้มยำกุ้งน้ำข้น', 120.00, 1, 30.00, 150.00, NULL, '2026-03-30 22:14:00');
+(5, 'ORD-1774883640660', 'MN-006', 'ต้มยำกุ้งน้ำข้น', 120.00, 1, 30.00, 150.00, NULL, '2026-03-30 22:14:00'),
+(6, 'ORD-1774978108376', 'MN-006', 'ต้มยำกุ้งน้ำข้น', 120.00, 1, 30.00, 150.00, NULL, '2026-04-01 00:28:28');
 
 -- --------------------------------------------------------
 
@@ -278,7 +281,8 @@ CREATE TABLE `order_item_toppings` (
 --
 
 INSERT INTO `order_item_toppings` (`id`, `order_item_id`, `topping_name`, `extra_price`) VALUES
-(1, 5, 'กุ้งพิเศษ', 30.00);
+(1, 5, 'กุ้งพิเศษ', 30.00),
+(2, 6, 'กุ้งพิเศษ', 30.00);
 
 -- --------------------------------------------------------
 
@@ -300,12 +304,13 @@ CREATE TABLE `restaurant_tables` (
 --
 
 INSERT INTO `restaurant_tables` (`table_id`, `table_name`, `capacity`, `status`, `current_order_id`, `updated_at`) VALUES
-('01', 'Table 01', 4, 'vacant', NULL, '2026-03-30 22:31:04'),
-('02', 'Table 02', 4, 'occupied', NULL, '2026-03-30 22:31:08'),
+('01', 'Table 01', 4, 'vacant', NULL, '2026-04-01 00:28:43'),
+('02', 'Table 02', 4, 'vacant', NULL, '2026-04-01 00:13:01'),
 ('03', 'Table 03', 4, 'vacant', NULL, '2026-03-30 13:41:19'),
 ('04', 'Table 04', 2, 'vacant', NULL, '2026-03-30 13:41:19'),
 ('05', 'Table 05', 4, 'vacant', NULL, '2026-03-30 13:41:19'),
-('06', 'Table 06', 6, 'vacant', NULL, '2026-03-30 13:41:19');
+('06', 'Table 06', 6, 'vacant', NULL, '2026-03-30 13:41:19'),
+('07', 'Table 07', 4, 'vacant', NULL, '2026-04-01 03:46:27');
 
 -- --------------------------------------------------------
 
@@ -352,7 +357,6 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
   `role` enum('admin','chef') NOT NULL DEFAULT 'chef',
-  `cook_id` varchar(20) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -362,9 +366,10 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `cook_id`, `is_active`, `created_at`, `updated_at`) VALUES
-('ADM001', 'admin', '$argon2id$v=19$m=19456,t=2,p=1$GxFzOjq4KIWF77ctaJC3ag$wTVk2ezCR6IWT9I7s5YeQ2MlIyPfqL4LMAAsquCM3Pc', 'ผู้ดูแลระบบ', 'admin', 'ADM-001', 1, '2026-03-30 13:41:19', '2026-03-30 13:41:19'),
-('CF001', 'chef1', '$argon2id$v=19$m=19456,t=2,p=1$gunj5vDOuBDBtJjo8C+4bg$JMmt8rG6eSI3UJ4bQD+wg38lh6V6oyKTluXvlNGQzTY', 'Chef One', 'chef', 'CF001', 1, '2026-03-30 13:41:19', '2026-03-30 13:41:19');
+INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `is_active`, `created_at`, `updated_at`) VALUES
+('ADM001', 'admin', '$argon2id$v=19$m=19456,t=2,p=1$GxFzOjq4KIWF77ctaJC3ag$wTVk2ezCR6IWT9I7s5YeQ2MlIyPfqL4LMAAsquCM3Pc', 'ผู้ดูแลระบบ', 'admin', 1, '2026-03-30 13:41:19', '2026-03-30 13:41:19'),
+('CF001', 'chef1', '$argon2id$v=19$m=19456,t=2,p=1$gunj5vDOuBDBtJjo8C+4bg$JMmt8rG6eSI3UJ4bQD+wg38lh6V6oyKTluXvlNGQzTY', 'Chef One', 'chef', 1, '2026-03-30 13:41:19', '2026-03-30 13:41:19'),
+('CHF-1774988348092', 'string', '$argon2id$v=19$m=19456,t=2,p=1$W54mRNjhStjFar6HCouF3A$+KhAVuHL8aUNMonjTSeOGCps7om1pgEKLtlUThQFZpI', 'string', 'chef', 1, '2026-04-01 03:19:08', '2026-04-01 03:19:08');
 
 -- --------------------------------------------------------
 
@@ -507,13 +512,13 @@ ALTER TABLE `menu_toppings`
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `order_item_toppings`
 --
 ALTER TABLE `order_item_toppings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `reviews`
